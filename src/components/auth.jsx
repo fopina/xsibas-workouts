@@ -7,10 +7,13 @@ const Auth = ({ onAuthChange }) => {
   useEffect(() => {
     const initializeGis = () => {
       if (window.google && window.google.accounts) {
+        console.log('Initializing Google Identity Services');
+        console.log('Client ID:', import.meta.env.VITE_GOOGLE_CLIENT_ID);
         const client = window.google.accounts.oauth2.initTokenClient({
           client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
           scope: 'https://www.googleapis.com/auth/spreadsheets.readonly',
           callback: (tokenResponse) => {
+            console.log('Token response received:', tokenResponse);
             if (tokenResponse && tokenResponse.access_token) {
               setAccessToken(tokenResponse.access_token);
               onAuthChange(tokenResponse.access_token);
@@ -18,6 +21,7 @@ const Auth = ({ onAuthChange }) => {
           },
         });
         setTokenClient(client);
+        console.log('Token client initialized');
       }
     };
 
@@ -34,10 +38,15 @@ const Auth = ({ onAuthChange }) => {
   }, [onAuthChange]);
 
   const handleLogin = () => {
+    console.log('Login button clicked');
+    console.log('Token client available:', !!tokenClient);
     if (tokenClient) {
       // Prompt the user to select a Google Account and ask for consent to share their data
       // when establishing a new session.
+      console.log('Requesting access token...');
       tokenClient.requestAccessToken();
+    } else {
+      console.error('Token client not initialized');
     }
   };
 

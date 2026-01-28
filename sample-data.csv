@@ -1,0 +1,22 @@
+**For 'Exercises' Sheet:**
+
+ExerciseName,MuscleGroup,Equipment,VideoLink
+Barbell Back Squat,Legs,Barbell,https://www.youtube.com/watch?v=R0_q40eG8bt
+Deadlift,Full Body,Barbell,https://www.youtube.com/watch?v=yt_sZq0rQ1I
+Bench Press,Chest,Barbell,https://www.youtube.com/watch?v=gfgdC3M8I6I
+Overhead Press,Shoulders,Barbell,https://www.youtube.com/watch?v=sqh_P_WwL9s
+Pull-ups,Back,Bodyweight,https://www.youtube.com/watch?v=vw5T5S6w60I
+Push-ups,Chest,Bodyweight,https://www.youtube.com/watch?v=IODxDxX7Hsc
+Air Squats,Legs,Bodyweight,https://www.youtube.com/watch?v=C2YI_mB7c5U
+
+**For 'WorkoutLog' Sheet:**
+
+Date,Day,Section,Section Prescription,Section Score,Exercise,Exercise Details,Notes
+2026-01-14,Day 1,Strength,5x5,,Barbell Back Squat,225 lbs,Last set was a grinder.
+2026-01-14,Day 1,Strength,5x5,,Deadlift,275 lbs,Felt heavy today.
+2026-01-14,Day 1,WOD,AMRAP 20 min,5 rounds + 3 reps,Pull-ups,5 reps per round,
+2026-01-14,Day 1,WOD,AMRAP 20 min,5 rounds + 3 reps,Push-ups,10 reps per round,
+2026-01-14,Day 1,WOD,AMRAP 20 min,5 rounds + 3 reps,Air Squats,15 reps per round,
+2026-01-15,Day 2,Strength,3x5,,Bench Press,185 lbs,Spotter needed on last rep.
+2026-01-15,Day 2,Strength,3x5,,Overhead Press,105 lbs,Good form.
+2026-01-15,Day 2,Accessory,3x10,,Push-ups,Bodyweight,

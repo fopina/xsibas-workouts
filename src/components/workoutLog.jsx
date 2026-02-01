@@ -184,7 +184,13 @@ const WorkoutLog = ({ accessToken, sheetId }) => {
       {viewMode === 'week' ? (
         // Week View
         <div>
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(7, 1fr)',
+            gap: '5px',
+            marginBottom: '20px',
+            width: '100%'
+          }}>
             {weekDates.map((date, index) => {
               const hasWorkoutOnDate = hasWorkout(date);
               const isSelected = isSelectedDate(date);
@@ -195,24 +201,24 @@ const WorkoutLog = ({ accessToken, sheetId }) => {
                   key={index}
                   onClick={() => setSelectedDate(date)}
                   style={{
-                    flex: 1,
-                    padding: '15px',
+                    padding: '10px 5px',
                     textAlign: 'center',
                     borderRadius: '8px',
                     cursor: 'pointer',
                     backgroundColor: hasWorkoutOnDate ? '#2d5016' : '#333',
                     border: isSelected ? '2px solid #646cff' : isTodayDate ? '2px solid #555' : '1px solid #444',
-                    transition: 'all 0.2s'
+                    transition: 'all 0.2s',
+                    minWidth: 0
                   }}
                 >
-                  <div style={{ fontSize: '0.85em', color: '#aaa', marginBottom: '5px' }}>
+                  <div style={{ fontSize: '0.75em', color: '#aaa', marginBottom: '5px' }}>
                     {formatDayName(date)}
                   </div>
-                  <div style={{ fontSize: '1.1em', fontWeight: isSelected ? 'bold' : 'normal' }}>
+                  <div style={{ fontSize: '0.95em', fontWeight: isSelected ? 'bold' : 'normal' }}>
                     {formatDate(date)}
                   </div>
                   {hasWorkoutOnDate && (
-                    <div style={{ marginTop: '5px', fontSize: '0.75em', color: '#8bc34a' }}>
+                    <div style={{ marginTop: '3px', fontSize: '0.7em', color: '#8bc34a' }}>
                       ✓
                     </div>
                   )}

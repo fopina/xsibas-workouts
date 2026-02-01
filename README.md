@@ -1,13 +1,20 @@
 # Workout Planner
 
-This is a simple web application that allows users to view their workout plan from a Google Sheet.
+A web application that displays workout plans from a Google Sheet with an intuitive calendar interface. Features week and month views with color-coded workout days.
+
+## Features
+
+- Google OAuth authentication with persistent login
+- Week and month calendar views
+- Color-coded days (green for workout days, gray for rest days)
+- Responsive design for mobile and desktop
+- Sheet selection via URL or direct input
 
 ## Environment Variables
 
-To run this project, you will need to create a `.env` file in the root of the project and add the following environment variables:
+To run this project, you will need to create a `.env` file in the root of the project and add the following environment variable:
 
 *   `VITE_GOOGLE_CLIENT_ID`: Your Google Cloud project's OAuth 2.0 Client ID.
-*   `VITE_GOOGLE_SHEET_ID`: The ID of the Google Sheet containing the workout data.
 
 ## Getting Started
 
@@ -19,6 +26,26 @@ To run this project, you will need to create a `.env` file in the root of the pr
     ```bash
     npm run dev
     ```
+
+    For LAN access (access from other devices on your network):
+    ```bash
+    npm run dev:lan
+    ```
+
+3. Open the application in your browser and log in with Google.
+
+4. Enter your Google Sheet ID or paste the full Google Sheets URL:
+   - Full URL example: `https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit`
+   - Direct ID: `YOUR_SHEET_ID`
+
+   Alternatively, you can access a sheet directly via URL parameter:
+   ```
+   http://localhost:5173/?sheet=YOUR_SHEET_ID
+   ```
+
+## Sheet Format
+
+The application expects a Google Sheet with a tab named "WorkoutLog" containing workout data with columns including at least a "Date" column in YYYY-MM-DD format.
 
 ## Technologies Used
 
@@ -32,6 +59,7 @@ To run this project, you will need to create a `.env` file in the root of the pr
 /
 ├── .env
 ├── .gitignore
+├── CLAUDE.md
 ├── index.html
 ├── package.json
 ├── vite.config.js
@@ -39,13 +67,13 @@ To run this project, you will need to create a `.env` file in the root of the pr
 ├── public/
 │   └── vite.svg
 └── src/
-    ├── app.css
-    ├── app.jsx
+    ├── app.css              # Global styles and responsive design
+    ├── app.jsx              # Main app component with sheet ID input
     ├── index.css
     ├── main.jsx
     ├── assets/
     │   └── preact.svg
     └── components/
-        ├── auth.jsx
-        └── workoutLog.jsx
+        ├── auth.jsx         # Google OAuth with localStorage persistence
+        └── workoutLog.jsx   # Calendar views (week/month) for workouts
 ```

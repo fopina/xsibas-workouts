@@ -7,6 +7,59 @@ const WorkoutLog = ({ accessToken }) => {
   const [workouts, setWorkouts] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [weekDates, setWeekDates] = useState([]);
+  const [viewMode, setViewMode] = useState('week'); // 'week' or 'month'
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+
+  // Generate week dates centered on selected date
+  useEffect(() => {
+    const generateWeekDates = (centerDate) => {
+      const dates = [];
+      const startOfWeek = new Date(centerDate);
+      startOfWeek.setDate(centerDate.getDate() - centerDate.getDay()); // Start from Sunday
+
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(startOfWeek);
+        date.setDate(startOfWeek.getDate() + i);
+        dates.push(date);
+      }
+      return dates;
+    };
+
+    setWeekDates(generateWeekDates(selectedDate));
+  }, [selectedDate]);
+
+  // Generate month calendar (6 weeks to show full month grid)
+  const generateMonthDates = (month) => {
+    const dates = [];
+    const firstDay = new Date(month.getFullYear(), month.getMonth(), 1);
+    const lastDay = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+
+    // Start from the Sunday before or on the first day of month
+    const startDate = new Date(firstDay);
+    startDate.setDate(firstDay.getDate() - firstDay.getDay());
+
+    // Generate 6 weeks (42 days) to always show complete weeks
+    for (let i = 0; i < 42; i++) {
+      const date = new Date(startDate);
+      date.setDate(startDate.getDate() + i);
+      dates.push(date);
+    }
+
+    return dates;
+  };
+
+  const handleDayClick = (date) => {
+    setSelectedDate(date);
+    setViewMode('week');
+  };
+
+  const changeMonth = (offset) => {
+    const newMonth = new Date(currentMonth);
+    newMonth.setMonth(currentMonth.getMonth() + offset);
+    setCurrentMonth(newMonth);
+  };
 
   useEffect(() => {
     if (!accessToken) {
@@ -88,27 +141,171 @@ const WorkoutLog = ({ accessToken }) => {
     return <p style={{ color: 'red' }}>{error}</p>;
   }
   
-  if (!workouts.length) {
-    return <p>No workouts logged yet.</p>
-  }
+  // Helper function to check if a date has workouts
+  const hasWorkout = (date) => {
+    const dateStr = date.toISOString().split('T')[0];
+    return workouts.some(workout => workout.Date === dateStr);
+  };
+
+  // Helper function to get workouts for a specific date
+  const getWorkoutsForDate = (date) => {
+    const dateStr = date.toISOString().split('T')[0];
+    return workouts.filter(workout => workout.Date === dateStr);
+  };
+
+  const formatDate = (date) => {
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  const formatDayName = (date) => {
+    return date.toLocaleDateString('en-US', { weekday: 'short' });
+  };
+
+  const isToday = (date) => {
+    const today = new Date();
+    return date.toDateString() === today.toDateString();
+  };
+
+  const isSelectedDate = (date) => {
+    return date.toDateString() === selectedDate.toDateString();
+  };
 
   return (
     <div>
-      <h2>Workout Log</h2>
-      <table border="1" style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr>
-            {workouts.length > 0 && Object.keys(workouts[0]).map(key => <th key={key}>{key}</th>)}
-          </tr>
-        </thead>
-        <tbody>
-          {workouts.map((workout, index) => (
-            <tr key={index}>
-              {Object.values(workout).map((value, i) => <td key={i}>{value}</td>)}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h2>Workout Log</h2>
+        <button
+          onClick={() => setViewMode(viewMode === 'week' ? 'month' : 'week')}
+          style={{ fontSize: '0.9em', padding: '0.5em 1em' }}
+        >
+          {viewMode === 'week' ? 'Month View' : 'Week View'}
+        </button>
+      </div>
+
+      {viewMode === 'week' ? (
+        // Week View
+        <div>
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+            {weekDates.map((date, index) => {
+              const hasWorkoutOnDate = hasWorkout(date);
+              const isSelected = isSelectedDate(date);
+              const isTodayDate = isToday(date);
+
+              return (
+                <div
+                  key={index}
+                  onClick={() => setSelectedDate(date)}
+                  style={{
+                    flex: 1,
+                    padding: '15px',
+                    textAlign: 'center',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    backgroundColor: hasWorkoutOnDate ? '#2d5016' : '#333',
+                    border: isSelected ? '2px solid #646cff' : isTodayDate ? '2px solid #555' : '1px solid #444',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <div style={{ fontSize: '0.85em', color: '#aaa', marginBottom: '5px' }}>
+                    {formatDayName(date)}
+                  </div>
+                  <div style={{ fontSize: '1.1em', fontWeight: isSelected ? 'bold' : 'normal' }}>
+                    {formatDate(date)}
+                  </div>
+                  {hasWorkoutOnDate && (
+                    <div style={{ marginTop: '5px', fontSize: '0.75em', color: '#8bc34a' }}>
+                      ✓
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Show workout details for selected date */}
+          <div>
+            {getWorkoutsForDate(selectedDate).length > 0 ? (
+              <div>
+                <h3>Workouts for {formatDate(selectedDate)}</h3>
+                {getWorkoutsForDate(selectedDate).map((workout, index) => (
+                  <div key={index} style={{
+                    marginBottom: '15px',
+                    padding: '10px',
+                    backgroundColor: '#1a1a1a',
+                    borderRadius: '5px',
+                    border: '1px solid #333'
+                  }}>
+                    {Object.entries(workout).map(([key, value]) => (
+                      value && <div key={key}><strong>{key}:</strong> {value}</div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p style={{ color: '#888' }}>No workout logged for {formatDate(selectedDate)}</p>
+            )}
+          </div>
+        </div>
+      ) : (
+        // Month View
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+            <button onClick={() => changeMonth(-1)} style={{ fontSize: '0.9em', padding: '0.5em 1em' }}>
+              ← Previous
+            </button>
+            <h3 style={{ margin: 0 }}>
+              {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+            </h3>
+            <button onClick={() => changeMonth(1)} style={{ fontSize: '0.9em', padding: '0.5em 1em' }}>
+              Next →
+            </button>
+          </div>
+
+          {/* Day names header */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '5px', marginBottom: '5px' }}>
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+              <div key={day} style={{ textAlign: 'center', fontSize: '0.85em', color: '#aaa', padding: '5px' }}>
+                {day}
+              </div>
+            ))}
+          </div>
+
+          {/* Month calendar grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '5px' }}>
+            {generateMonthDates(currentMonth).map((date, index) => {
+              const hasWorkoutOnDate = hasWorkout(date);
+              const isTodayDate = isToday(date);
+              const isCurrentMonth = date.getMonth() === currentMonth.getMonth();
+
+              return (
+                <div
+                  key={index}
+                  onClick={() => handleDayClick(date)}
+                  style={{
+                    padding: '10px',
+                    textAlign: 'center',
+                    borderRadius: '5px',
+                    cursor: 'pointer',
+                    backgroundColor: hasWorkoutOnDate ? '#2d5016' : '#333',
+                    border: isTodayDate ? '2px solid #555' : '1px solid #444',
+                    opacity: isCurrentMonth ? 1 : 0.4,
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <div style={{ fontSize: '0.9em' }}>
+                    {date.getDate()}
+                  </div>
+                  {hasWorkoutOnDate && (
+                    <div style={{ marginTop: '3px', fontSize: '0.7em', color: '#8bc34a' }}>
+                      ✓
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

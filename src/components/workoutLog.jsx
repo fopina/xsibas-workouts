@@ -3,7 +3,7 @@ import { useState, useEffect } from 'preact/hooks';
 // We access gapi via the window object, as it's loaded from a script tag.
 const gapi = window.gapi;
 
-const WorkoutLog = ({ accessToken }) => {
+const WorkoutLog = ({ accessToken, sheetId }) => {
   const [workouts, setWorkouts] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -99,7 +99,6 @@ const WorkoutLog = ({ accessToken }) => {
         }
 
         // 3. Make the API request
-        const sheetId = import.meta.env.VITE_GOOGLE_SHEET_ID;
         const range = 'WorkoutLog!A:H';
         
         const response = await gapi.client.sheets.spreadsheets.values.get({
@@ -131,7 +130,7 @@ const WorkoutLog = ({ accessToken }) => {
 
     fetchSheetData();
 
-  }, [accessToken]); // This effect runs when accessToken changes
+  }, [accessToken, sheetId]); // This effect runs when accessToken or sheetId changes
 
   if (loading) {
     return <p>Loading workout data...</p>;

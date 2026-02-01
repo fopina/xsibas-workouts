@@ -69,8 +69,8 @@ export function App() {
       </header>
       <main>
         {!sheetId ? (
-          <div style={{ maxWidth: '500px', margin: '0 auto' }}>
-            <h3>Enter Google Sheet</h3>
+          <div style={{ maxWidth: '500px', margin: '0 auto', width: '100%' }}>
+            <h3 style={{ fontSize: '1.3em' }}>Enter Google Sheet</h3>
             <p style={{ color: '#888', fontSize: '0.9em', marginBottom: '1em' }}>
               Paste your Google Sheets URL or Sheet ID below:
             </p>
@@ -79,11 +79,11 @@ export function App() {
                 type="text"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                placeholder="https://docs.google.com/spreadsheets/d/... or Sheet ID"
+                placeholder="Sheet URL or ID"
                 style={{
                   width: '100%',
                   padding: '0.75em',
-                  fontSize: '0.95em',
+                  fontSize: '0.9em',
                   borderRadius: '5px',
                   border: '1px solid #555',
                   backgroundColor: '#1a1a1a',
@@ -103,7 +103,7 @@ export function App() {
                 Load Workout Sheet
               </button>
             </form>
-            <p style={{ color: '#666', fontSize: '0.85em', marginTop: '1em' }}>
+            <p style={{ color: '#666', fontSize: '0.8em', marginTop: '1em', wordBreak: 'break-all' }}>
               Example: https://docs.google.com/spreadsheets/d/1VB5ncABedr88ucuxfE6UdLv9OFKo0foTSJD0Qel6OtE/edit
             </p>
           </div>

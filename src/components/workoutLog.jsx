@@ -7,10 +7,33 @@ const WorkoutLog = ({ accessToken, sheetId }) => {
   const [workouts, setWorkouts] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(new Date());
+
+  // Initialize selected date from URL or default to today
+  const getInitialDate = () => {
+    const params = new URLSearchParams(window.location.search);
+    const dateParam = params.get('date');
+    if (dateParam) {
+      const parsedDate = new Date(dateParam);
+      if (!isNaN(parsedDate.getTime())) {
+        return parsedDate;
+      }
+    }
+    return new Date();
+  };
+
+  const [selectedDate, setSelectedDate] = useState(getInitialDate());
   const [weekDates, setWeekDates] = useState([]);
   const [viewMode, setViewMode] = useState('week'); // 'week' or 'month'
   const [currentMonth, setCurrentMonth] = useState(new Date());
+
+  // Update URL when selected date changes
+  useEffect(() => {
+    const dateStr = selectedDate.toISOString().split('T')[0];
+    const params = new URLSearchParams(window.location.search);
+    params.set('date', dateStr);
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    window.history.replaceState({}, '', newUrl);
+  }, [selectedDate]);
 
   // Generate week dates centered on selected date
   useEffect(() => {

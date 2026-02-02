@@ -232,19 +232,67 @@ const WorkoutLog = ({ accessToken, sheetId }) => {
             {getWorkoutsForDate(selectedDate).length > 0 ? (
               <div>
                 <h3>Workouts for {formatDate(selectedDate)}</h3>
-                {getWorkoutsForDate(selectedDate).map((workout, index) => (
-                  <div key={index} style={{
-                    marginBottom: '15px',
-                    padding: '10px',
-                    backgroundColor: '#1a1a1a',
-                    borderRadius: '5px',
-                    border: '1px solid #333'
-                  }}>
-                    {Object.entries(workout).map(([key, value]) => (
-                      value && <div key={key}><strong>{key}:</strong> {value}</div>
-                    ))}
-                  </div>
-                ))}
+                {(() => {
+                  const workoutsForDate = getWorkoutsForDate(selectedDate);
+                  const sections = {};
+
+                  // Group workouts by section
+                  workoutsForDate.forEach(workout => {
+                    const section = workout.Section || 'Other';
+                    if (!sections[section]) {
+                      sections[section] = [];
+                    }
+                    sections[section].push(workout);
+                  });
+
+                  return Object.entries(sections).map(([sectionName, exercises]) => {
+                    // Get section prescription from first exercise (same for all in section)
+                    const sectionPrescription = exercises[0]?.['Section Prescription'] || '';
+
+                    return (
+                      <div key={sectionName} style={{ marginBottom: '20px' }}>
+                        <h4 style={{
+                          fontSize: '1.1em',
+                          marginBottom: '5px',
+                          color: '#8bc34a',
+                          borderBottom: '1px solid #444',
+                          paddingBottom: '5px'
+                        }}>
+                          {sectionName}
+                        </h4>
+                        {sectionPrescription && (
+                          <p style={{
+                            fontSize: '0.9em',
+                            color: '#aaa',
+                            marginBottom: '10px',
+                            fontStyle: 'italic'
+                          }}>
+                            {sectionPrescription}
+                          </p>
+                        )}
+                        {exercises.map((exercise, index) => (
+                          <div key={index} style={{
+                            marginBottom: '10px',
+                            padding: '10px',
+                            backgroundColor: '#1a1a1a',
+                            borderRadius: '5px',
+                            border: '1px solid #333'
+                          }}>
+                            {Object.entries(exercise).map(([key, value]) => {
+                              // Skip Date, Section, Section Prescription, and Day as they're already shown
+                              if (key === 'Date' || key === 'Section' || key === 'Section Prescription' || key === 'Day' || !value) return null;
+                              return (
+                                <div key={key} style={{ marginBottom: '3px' }}>
+                                  <strong>{key}:</strong> {value}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             ) : (
               <p style={{ color: '#888' }}>No workout logged for {formatDate(selectedDate)}</p>

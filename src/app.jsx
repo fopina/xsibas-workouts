@@ -338,24 +338,26 @@ export function App() {
                 </button>
               </div>
             ))}
-            {accessToken && (
-              <button
-                onClick={openPicker}
-                style={{
-                  width: '100%',
-                  padding: '0.75em',
-                  fontSize: '0.9em',
-                  backgroundColor: '#1a1a1a',
-                  border: '1px solid #555',
-                  borderRadius: '5px',
-                  cursor: 'pointer',
-                  color: '#8bc34a',
-                  marginTop: '0.5em'
-                }}
-              >
-                📁 Pick from Google Drive
-              </button>
-            )}
+          </div>
+        )}
+
+        {accessToken && (
+          <div style={{ marginBottom: '1.5em' }}>
+            <button
+              onClick={openPicker}
+              style={{
+                width: '100%',
+                padding: '0.75em',
+                fontSize: '0.9em',
+                backgroundColor: '#1a1a1a',
+                border: '1px solid #555',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                color: '#8bc34a'
+              }}
+            >
+              📁 Pick from Google Drive
+            </button>
           </div>
         )}
 

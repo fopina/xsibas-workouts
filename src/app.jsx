@@ -170,7 +170,7 @@ export function App() {
         .setIncludeFolders(true)
         .setOwnedByMe(false);
 
-      const picker = new google.picker.PickerBuilder()
+      const pickerBuilder = new google.picker.PickerBuilder()
         .addView(ownedView)
         .addView(sharedView)
         .setOAuthToken(accessToken)
@@ -185,8 +185,18 @@ export function App() {
             console.log('Calling loadSheet with ID:', pickedSheetId);
             loadSheet(pickedSheetId);
           }
-        })
-        .build();
+        });
+
+      // Add developer key if available (required for proper drive.file authorization)
+      const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
+      if (apiKey && apiKey !== 'YOUR_API_KEY_HERE') {
+        console.log('Setting developer key for picker');
+        pickerBuilder.setDeveloperKey(apiKey);
+      } else {
+        console.warn('No API key configured - shared file access may not work properly');
+      }
+
+      const picker = pickerBuilder.build();
       console.log('Picker built, showing...');
       picker.setVisible(true);
     });

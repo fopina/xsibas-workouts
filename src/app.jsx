@@ -163,11 +163,13 @@ export function App() {
       const ownedView = new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS)
         .setMimeTypes('application/vnd.google-apps.spreadsheet')
         .setIncludeFolders(true)
+        .setMode(google.picker.DocsViewMode.LIST)
         .setOwnedByMe(true);
 
       const sharedView = new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS)
         .setMimeTypes('application/vnd.google-apps.spreadsheet')
         .setIncludeFolders(true)
+        .setMode(google.picker.DocsViewMode.LIST)
         .setOwnedByMe(false);
 
       const pickerBuilder = new google.picker.PickerBuilder()

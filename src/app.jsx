@@ -158,7 +158,7 @@ export function App() {
   const openPicker = () => {
     // Load the Picker API
     gapi.load('picker', () => {
-      const pickerBuilder = new google.picker.PickerBuilder()
+      const picker = new google.picker.PickerBuilder()
         .addView(
           new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS)
             .setOwnedByMe(true)
@@ -174,15 +174,8 @@ export function App() {
             const pickedSheetId = doc.id;
             loadSheet(pickedSheetId);
           }
-        });
-
-      // API key is optional - only needed for quota management
-      const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
-      if (apiKey) {
-        pickerBuilder.setDeveloperKey(apiKey);
-      }
-
-      const picker = pickerBuilder.build();
+        })
+        .build();
       picker.setVisible(true);
     });
   };

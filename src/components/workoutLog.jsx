@@ -122,7 +122,7 @@ const WorkoutLog = ({ accessToken, sheetId }) => {
         }
 
         // 3. Make the API request
-        const range = 'WorkoutLog!A:H';
+        const range = 'WorkoutLog!A:Z';
         
         const response = await gapi.client.sheets.spreadsheets.values.get({
           spreadsheetId: sheetId,
@@ -302,8 +302,28 @@ const WorkoutLog = ({ accessToken, sheetId }) => {
                             border: '1px solid #333'
                           }}>
                             {Object.entries(exercise).map(([key, value]) => {
-                              // Skip Date, Section, Section Prescription, and Day as they're already shown
-                              if (key === 'Date' || key === 'Section' || key === 'Section Prescription' || key === 'Day' || !value) return null;
+                              // Skip Date, Section, Section Prescription, Day, and VideoLink as they're handled separately
+                              if (key === 'Date' || key === 'Section' || key === 'Section Prescription' || key === 'Day' || key === 'VideoLink' || !value) return null;
+
+                              // Special handling for Exercise field - link to video if available
+                              if (key === 'Exercise' && exercise.VideoLink) {
+                                return (
+                                  <div key={key} style={{ marginBottom: '3px' }}>
+                                    <strong>{key}:</strong>{' '}
+                                    <a
+                                      href={exercise.VideoLink}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      style={{ color: '#646cff', textDecoration: 'none' }}
+                                      onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
+                                      onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
+                                    >
+                                      {value}
+                                    </a>
+                                  </div>
+                                );
+                              }
+
                               return (
                                 <div key={key} style={{ marginBottom: '3px' }}>
                                   <strong>{key}:</strong> {value}

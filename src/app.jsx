@@ -111,6 +111,23 @@ export function App() {
     setShowSheetSelector(false);
   };
 
+  const unloadSheet = () => {
+    setSheetId('');
+    // Remove sheet parameter from URL
+    const newUrl = new URL(window.location);
+    newUrl.searchParams.delete('sheet');
+    window.history.pushState({}, '', newUrl);
+  };
+
+  const deleteSheetFromHistory = (sheetIdToDelete) => {
+    const history = getSheetsHistory();
+    delete history[sheetIdToDelete];
+    localStorage.setItem(SHEETS_HISTORY_KEY, JSON.stringify(history));
+    // Force re-render by toggling sheet selector
+    setShowSheetSelector(false);
+    setTimeout(() => setShowSheetSelector(true), 0);
+  };
+
   useEffect(() => {
     // Extract sheet ID from URL query parameter
     const params = new URLSearchParams(window.location.search);
@@ -172,11 +189,26 @@ export function App() {
             border: '2px solid #8bc34a',
             marginBottom: '1.5em'
           }}>
-            <p style={{ margin: 0, fontSize: '0.9em', color: '#aaa' }}>
-              Currently open:
-            </p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5em' }}>
+              <p style={{ margin: 0, fontSize: '0.9em', color: '#aaa' }}>
+                Currently open:
+              </p>
+              <button
+                onClick={unloadSheet}
+                style={{
+                  padding: '0.3em 0.6em',
+                  fontSize: '0.75em',
+                  backgroundColor: '#933',
+                  color: '#fff',
+                  border: '1px solid #a44',
+                  borderRadius: '3px',
+                  cursor: 'pointer'
+                }}
+              >
+                Unload
+              </button>
+            </div>
             <div style={{
-              margin: '0.5em 0 0 0',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
@@ -211,38 +243,74 @@ export function App() {
             {sortedSheets.map(([id, data]) => (
               <div
                 key={id}
-                onClick={() => loadSheet(id)}
                 style={{
                   padding: '0.75em',
                   backgroundColor: '#1a1a1a',
                   border: '1px solid #333',
                   borderRadius: '5px',
                   marginBottom: '0.5em',
-                  cursor: 'pointer',
-                  transition: 'background-color 0.2s',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   gap: '10px'
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#252525'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1a1a1a'}
               >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '0.9em', marginBottom: '0.25em' }}>
-                    {data.title || 'Untitled Sheet'}
+                <div
+                  onClick={() => loadSheet(id)}
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '10px'
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '0.9em', marginBottom: '0.25em' }}>
+                      {data.title || 'Untitled Sheet'}
+                    </div>
+                    <div style={{
+                      fontFamily: 'monospace',
+                      fontSize: '0.75em',
+                      color: '#666'
+                    }}>
+                      {truncateSheetId(id)}
+                    </div>
                   </div>
-                  <div style={{
-                    fontFamily: 'monospace',
+                  <div style={{ fontSize: '0.75em', color: '#666', whiteSpace: 'nowrap' }}>
+                    {formatRelativeTime(data.lastOpened)}
+                  </div>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteSheetFromHistory(id);
+                  }}
+                  style={{
+                    padding: '0.3em 0.6em',
                     fontSize: '0.75em',
-                    color: '#666'
-                  }}>
-                    {truncateSheetId(id)}
-                  </div>
-                </div>
-                <div style={{ fontSize: '0.75em', color: '#666', whiteSpace: 'nowrap' }}>
-                  {formatRelativeTime(data.lastOpened)}
-                </div>
+                    backgroundColor: '#333',
+                    color: '#999',
+                    border: '1px solid #444',
+                    borderRadius: '3px',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#933';
+                    e.target.style.color = '#fff';
+                    e.target.style.borderColor = '#a44';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = '#333';
+                    e.target.style.color = '#999';
+                    e.target.style.borderColor = '#444';
+                  }}
+                >
+                  Delete
+                </button>
               </div>
             ))}
           </div>

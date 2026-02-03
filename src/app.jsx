@@ -156,26 +156,38 @@ export function App() {
   };
 
   const openPicker = () => {
+    console.log('Opening picker...');
     // Load the Picker API
     gapi.load('picker', () => {
+      console.log('Picker API loaded');
+      const ownedView = new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS)
+        .setMimeTypes('application/vnd.google-apps.spreadsheet')
+        .setIncludeFolders(true)
+        .setOwnedByMe(true);
+
+      const sharedView = new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS)
+        .setMimeTypes('application/vnd.google-apps.spreadsheet')
+        .setIncludeFolders(true)
+        .setOwnedByMe(false);
+
       const picker = new google.picker.PickerBuilder()
-        .addView(
-          new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS)
-            .setOwnedByMe(true)
-        )
-        .addView(
-          new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS)
-            .setOwnedByMe(false)
-        )
+        .addView(ownedView)
+        .addView(sharedView)
         .setOAuthToken(accessToken)
         .setCallback((data) => {
+          console.log('Picker callback - action:', data.action);
+          console.log('Picker callback - full data:', data);
           if (data.action === google.picker.Action.PICKED) {
             const doc = data.docs[0];
+            console.log('Selected document:', doc);
+            console.log('Document ID:', doc.id);
             const pickedSheetId = doc.id;
+            console.log('Calling loadSheet with ID:', pickedSheetId);
             loadSheet(pickedSheetId);
           }
         })
         .build();
+      console.log('Picker built, showing...');
       picker.setVisible(true);
     });
   };

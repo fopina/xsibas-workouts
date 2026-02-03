@@ -403,7 +403,7 @@ export function App() {
         fontSize: '0.9em',
         color: '#666'
       }}>
-        <a href="/privacy" style={{ color: '#8bc34a', textDecoration: 'none' }}>
+        <a href="/privacy/" style={{ color: '#8bc34a', textDecoration: 'none' }}>
           Privacy Policy
         </a>
       </footer>

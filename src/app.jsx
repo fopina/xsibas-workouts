@@ -164,13 +164,15 @@ export function App() {
         .setMimeTypes('application/vnd.google-apps.spreadsheet')
         .setIncludeFolders(true)
         .setMode(google.picker.DocsViewMode.LIST)
-        .setOwnedByMe(true);
+        .setOwnedByMe(true)
+        .setLabel('My Spreadsheets');
 
       const sharedView = new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS)
         .setMimeTypes('application/vnd.google-apps.spreadsheet')
         .setIncludeFolders(true)
         .setMode(google.picker.DocsViewMode.LIST)
-        .setOwnedByMe(false);
+        .setOwnedByMe(false)
+        .setLabel('Shared with me');
 
       const pickerBuilder = new google.picker.PickerBuilder()
         .addView(ownedView)

@@ -3,7 +3,7 @@ import { useState, useEffect } from 'preact/hooks';
 // We access gapi via the window object, as it's loaded from a script tag.
 const gapi = window.gapi;
 
-const WorkoutLog = ({ accessToken, sheetId }) => {
+const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded }) => {
   const [workouts, setWorkouts] = useState([]);
   const [exerciseVideoMap, setExerciseVideoMap] = useState({});
   const [expandedVideos, setExpandedVideos] = useState({});
@@ -144,7 +144,21 @@ const WorkoutLog = ({ accessToken, sheetId }) => {
           return;
         }
 
-        // 3. Fetch Exercises tab to get video link mapping
+        // 3. Fetch spreadsheet metadata to get title
+        try {
+          const metadataResponse = await gapi.client.sheets.spreadsheets.get({
+            spreadsheetId: sheetId,
+            fields: 'properties.title'
+          });
+          const sheetTitle = metadataResponse.result.properties?.title;
+          if (sheetTitle && onSheetTitleLoaded) {
+            onSheetTitleLoaded(sheetId, sheetTitle);
+          }
+        } catch (err) {
+          console.warn('Could not fetch sheet title:', err);
+        }
+
+        // 5. Fetch Exercises tab to get video link mapping
         const exercisesResponse = await gapi.client.sheets.spreadsheets.values.get({
           spreadsheetId: sheetId,
           range: 'Exercises!A:D',
@@ -170,7 +184,7 @@ const WorkoutLog = ({ accessToken, sheetId }) => {
         }
         setExerciseVideoMap(videoMap);
 
-        // 4. Fetch WorkoutLog data
+        // 6. Fetch WorkoutLog data
         const workoutResponse = await gapi.client.sheets.spreadsheets.values.get({
           spreadsheetId: sheetId,
           range: 'WorkoutLog!A:Z',
@@ -244,7 +258,14 @@ const WorkoutLog = ({ accessToken, sheetId }) => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h2>Workout Log</h2>
         <button
-          onClick={() => setViewMode(viewMode === 'week' ? 'month' : 'week')}
+          onClick={() => {
+            const newMode = viewMode === 'week' ? 'month' : 'week';
+            if (newMode === 'month') {
+              // Set currentMonth to the month of the selected date
+              setCurrentMonth(new Date(selectedDate));
+            }
+            setViewMode(newMode);
+          }}
           style={{ fontSize: '0.9em', padding: '0.5em 1em' }}
         >
           {viewMode === 'week' ? 'Month View' : 'Week View'}
@@ -457,6 +478,7 @@ const WorkoutLog = ({ accessToken, sheetId }) => {
             {generateMonthDates(currentMonth).map((date, index) => {
               const hasWorkoutOnDate = hasWorkout(date);
               const isTodayDate = isToday(date);
+              const isSelected = isSelectedDate(date);
               const isCurrentMonth = date.getMonth() === currentMonth.getMonth();
 
               return (
@@ -469,7 +491,7 @@ const WorkoutLog = ({ accessToken, sheetId }) => {
                     borderRadius: '5px',
                     cursor: 'pointer',
                     backgroundColor: hasWorkoutOnDate ? '#2d5016' : '#333',
-                    border: isTodayDate ? '2px solid #555' : '1px solid #444',
+                    border: isSelected ? '2px solid #646cff' : isTodayDate ? '2px solid #555' : '1px solid #444',
                     opacity: isCurrentMonth ? 1 : 0.4,
                     transition: 'all 0.2s'
                   }}

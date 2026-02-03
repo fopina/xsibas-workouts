@@ -6,6 +6,7 @@ const gapi = window.gapi;
 const WorkoutLog = ({ accessToken, sheetId }) => {
   const [workouts, setWorkouts] = useState([]);
   const [exerciseVideoMap, setExerciseVideoMap] = useState({});
+  const [expandedVideos, setExpandedVideos] = useState({});
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -26,6 +27,13 @@ const WorkoutLog = ({ accessToken, sheetId }) => {
   const [weekDates, setWeekDates] = useState([]);
   const [viewMode, setViewMode] = useState('week'); // 'week' or 'month'
   const [currentMonth, setCurrentMonth] = useState(new Date());
+
+  const toggleVideo = (exerciseKey) => {
+    setExpandedVideos(prev => ({
+      ...prev,
+      [exerciseKey]: !prev[exerciseKey]
+    }));
+  };
 
   // Update URL when selected date changes
   useEffect(() => {
@@ -83,6 +91,20 @@ const WorkoutLog = ({ accessToken, sheetId }) => {
     const newMonth = new Date(currentMonth);
     newMonth.setMonth(currentMonth.getMonth() + offset);
     setCurrentMonth(newMonth);
+  };
+
+  // Helper function to extract YouTube video ID from URL
+  const getYouTubeVideoId = (url) => {
+    if (!url) return null;
+    const patterns = [
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+      /^([a-zA-Z0-9_-]{11})$/ // Direct video ID
+    ];
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match) return match[1];
+    }
+    return null;
   };
 
   useEffect(() => {
@@ -318,11 +340,14 @@ const WorkoutLog = ({ accessToken, sheetId }) => {
                             {sectionPrescription}
                           </p>
                         )}
-                        {exercises.map((exercise, index) => {
+                        {exercises.map((exercise, exerciseIndex) => {
                           const videoLink = exerciseVideoMap[exercise.Exercise];
+                          const videoId = getYouTubeVideoId(videoLink);
+                          const exerciseKey = `${sectionName}-${exerciseIndex}`;
+                          const showVideo = expandedVideos[exerciseKey];
 
                           return (
-                            <div key={index} style={{
+                            <div key={exerciseIndex} style={{
                               marginBottom: '10px',
                               padding: '10px',
                               backgroundColor: '#1a1a1a',
@@ -333,21 +358,53 @@ const WorkoutLog = ({ accessToken, sheetId }) => {
                                 // Skip Date, Section, Section Prescription, and Day as they're already shown
                                 if (key === 'Date' || key === 'Section' || key === 'Section Prescription' || key === 'Day' || !value) return null;
 
-                                // Special handling for Exercise field - link to video if available
+                                // Special handling for Exercise field - show with video toggle if available
                                 if (key === 'Exercise' && videoLink) {
                                   return (
-                                    <div key={key} style={{ marginBottom: '3px' }}>
-                                      <strong>{key}:</strong>{' '}
-                                      <a
-                                        href={videoLink}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        style={{ color: '#646cff', textDecoration: 'none' }}
-                                        onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
-                                        onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
-                                      >
-                                        {value}
-                                      </a>
+                                    <div key={key}>
+                                      <div style={{ marginBottom: '3px' }}>
+                                        <strong>{key}:</strong>{' '}
+                                        <a
+                                          href={videoLink}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          style={{ color: '#646cff', textDecoration: 'none' }}
+                                          onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
+                                          onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
+                                        >
+                                          {value}
+                                        </a>
+                                        {videoId && (
+                                          <button
+                                            onClick={() => toggleVideo(exerciseKey)}
+                                            style={{
+                                              marginLeft: '10px',
+                                              padding: '2px 8px',
+                                              fontSize: '0.85em',
+                                              backgroundColor: '#333',
+                                              color: '#aaa',
+                                              border: '1px solid #444',
+                                              borderRadius: '3px',
+                                              cursor: 'pointer'
+                                            }}
+                                          >
+                                            {showVideo ? '▲ Hide Video' : '▼ Show Video'}
+                                          </button>
+                                        )}
+                                      </div>
+                                      {showVideo && videoId && (
+                                        <div style={{ marginTop: '10px', marginBottom: '10px' }}>
+                                          <iframe
+                                            width="100%"
+                                            height="315"
+                                            src={`https://www.youtube.com/embed/${videoId}`}
+                                            frameBorder="0"
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                            allowFullScreen
+                                            style={{ borderRadius: '5px', maxWidth: '560px' }}
+                                          ></iframe>
+                                        </div>
+                                      )}
                                     </div>
                                   );
                                 }

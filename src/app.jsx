@@ -37,22 +37,53 @@ export function App() {
   };
 
   // Save sheet to history
-  const saveSheetToHistory = (sheetIdToSave) => {
+  const saveSheetToHistory = (sheetIdToSave, title = null) => {
     const history = getSheetsHistory();
     const now = new Date().toISOString();
 
     if (history[sheetIdToSave]) {
-      // Update last opened time
+      // Update last opened time and title if provided
       history[sheetIdToSave].lastOpened = now;
+      if (title) {
+        history[sheetIdToSave].title = title;
+      }
     } else {
       // Add new sheet
       history[sheetIdToSave] = {
         firstAdded: now,
-        lastOpened: now
+        lastOpened: now,
+        title: title || null
       };
     }
 
     localStorage.setItem(SHEETS_HISTORY_KEY, JSON.stringify(history));
+  };
+
+  // Update sheet title in history
+  const updateSheetTitle = (sheetIdToUpdate, title) => {
+    saveSheetToHistory(sheetIdToUpdate, title);
+  };
+
+  // Truncate sheet ID for display
+  const truncateSheetId = (id) => {
+    if (id.length <= 8) return id;
+    return `${id.substring(0, 4)}…${id.substring(id.length - 4)}`;
+  };
+
+  // Format relative time
+  const formatRelativeTime = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
   };
 
   const handleSheetSubmit = (e) => {
@@ -109,7 +140,9 @@ export function App() {
 
   const SheetSelector = () => {
     const history = getSheetsHistory();
+    const currentSheetData = sheetId ? history[sheetId] : null;
     const sortedSheets = Object.entries(history)
+      .filter(([id]) => id !== sheetId) // Exclude current sheet
       .sort(([, a], [, b]) => new Date(b.lastOpened) - new Date(a.lastOpened));
 
     return (
@@ -142,15 +175,31 @@ export function App() {
             <p style={{ margin: 0, fontSize: '0.9em', color: '#aaa' }}>
               Currently open:
             </p>
-            <p style={{
+            <div style={{
               margin: '0.5em 0 0 0',
-              fontFamily: 'monospace',
-              fontSize: '0.85em',
-              wordBreak: 'break-all',
-              color: '#8bc34a'
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: '10px'
             }}>
-              {sheetId}
-            </p>
+              <div>
+                <div style={{ fontSize: '1em', color: '#8bc34a', marginBottom: '0.25em' }}>
+                  {currentSheetData?.title || 'Untitled Sheet'}
+                </div>
+                <div style={{
+                  fontFamily: 'monospace',
+                  fontSize: '0.75em',
+                  color: '#666'
+                }}>
+                  {truncateSheetId(sheetId)}
+                </div>
+              </div>
+              {currentSheetData && (
+                <div style={{ fontSize: '0.75em', color: '#666', whiteSpace: 'nowrap' }}>
+                  {formatRelativeTime(currentSheetData.lastOpened)}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -165,26 +214,34 @@ export function App() {
                 onClick={() => loadSheet(id)}
                 style={{
                   padding: '0.75em',
-                  backgroundColor: id === sheetId ? '#1a3a1a' : '#1a1a1a',
-                  border: id === sheetId ? '1px solid #8bc34a' : '1px solid #333',
+                  backgroundColor: '#1a1a1a',
+                  border: '1px solid #333',
                   borderRadius: '5px',
                   marginBottom: '0.5em',
                   cursor: 'pointer',
-                  transition: 'background-color 0.2s'
+                  transition: 'background-color 0.2s',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '10px'
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = id === sheetId ? '#1a3a1a' : '#252525'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = id === sheetId ? '#1a3a1a' : '#1a1a1a'}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#252525'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1a1a1a'}
               >
-                <div style={{
-                  fontFamily: 'monospace',
-                  fontSize: '0.85em',
-                  wordBreak: 'break-all',
-                  marginBottom: '0.3em'
-                }}>
-                  {id}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '0.9em', marginBottom: '0.25em' }}>
+                    {data.title || 'Untitled Sheet'}
+                  </div>
+                  <div style={{
+                    fontFamily: 'monospace',
+                    fontSize: '0.75em',
+                    color: '#666'
+                  }}>
+                    {truncateSheetId(id)}
+                  </div>
                 </div>
-                <div style={{ fontSize: '0.75em', color: '#666' }}>
-                  Last opened: {new Date(data.lastOpened).toLocaleString()}
+                <div style={{ fontSize: '0.75em', color: '#666', whiteSpace: 'nowrap' }}>
+                  {formatRelativeTime(data.lastOpened)}
                 </div>
               </div>
             ))}
@@ -258,7 +315,11 @@ export function App() {
         {showSheetSelector || !sheetId ? (
           <SheetSelector />
         ) : accessToken && isGapiLoaded ? (
-          <WorkoutLog accessToken={accessToken} sheetId={sheetId} />
+          <WorkoutLog
+            accessToken={accessToken}
+            sheetId={sheetId}
+            onSheetTitleLoaded={updateSheetTitle}
+          />
         ) : (
           <p>Please log in with Google to view your workout plan.</p>
         )}

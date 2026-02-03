@@ -360,7 +360,7 @@ export function App() {
   return (
     <div class="app-container">
       <header>
-        <h1>Workout Planner</h1>
+        <h1>XSibas</h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {sheetId && (
             <button
@@ -395,6 +395,18 @@ export function App() {
             <p>Loading Google API client...</p>
         )}
       </main>
+      <footer style={{
+        textAlign: 'center',
+        padding: '1em',
+        marginTop: '2em',
+        borderTop: '1px solid #333',
+        fontSize: '0.9em',
+        color: '#666'
+      }}>
+        <a href="/privacy" style={{ color: '#8bc34a', textDecoration: 'none' }}>
+          Privacy Policy
+        </a>
+      </footer>
     </div>
   );
 }

@@ -155,6 +155,32 @@ export function App() {
     setAccessToken(token);
   };
 
+  const openPicker = () => {
+    // Load the Picker API
+    gapi.load('picker', () => {
+      const picker = new google.picker.PickerBuilder()
+        .addView(
+          new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS)
+            .setOwnedByMe(true)
+        )
+        .addView(
+          new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS)
+            .setOwnedByMe(false)
+        )
+        .setOAuthToken(accessToken)
+        .setDeveloperKey(import.meta.env.VITE_GOOGLE_API_KEY)
+        .setCallback((data) => {
+          if (data.action === google.picker.Action.PICKED) {
+            const doc = data.docs[0];
+            const pickedSheetId = doc.id;
+            loadSheet(pickedSheetId);
+          }
+        })
+        .build();
+      picker.setVisible(true);
+    });
+  };
+
   const SheetSelector = () => {
     const history = getSheetsHistory();
     const currentSheetData = sheetId ? history[sheetId] : null;
@@ -313,6 +339,24 @@ export function App() {
                 </button>
               </div>
             ))}
+            {accessToken && (
+              <button
+                onClick={openPicker}
+                style={{
+                  width: '100%',
+                  padding: '0.75em',
+                  fontSize: '0.9em',
+                  backgroundColor: '#1a1a1a',
+                  border: '1px solid #555',
+                  borderRadius: '5px',
+                  cursor: 'pointer',
+                  color: '#8bc34a',
+                  marginTop: '0.5em'
+                }}
+              >
+                📁 Pick from Google Drive
+              </button>
+            )}
           </div>
         )}
 

@@ -50,10 +50,40 @@ const picker = new google.picker.PickerBuilder()
 - `VITE_GOOGLE_CLIENT_ID` - OAuth 2.0 Client ID
 - `VITE_GOOGLE_API_KEY` - Browser API Key (no restrictions needed)
 
+### Critical File Access Scenarios
+
+The application must support three distinct file access scenarios:
+
+#### 1. Owned Files (Files created/owned by the user)
+- **Description**: Files that the user created or owns in their Google Drive
+- **Access Method**: Google Picker selection OR manual URL/ID input
+- **Expected Behavior**: Should work seamlessly with `drive.file` scope
+- **Current Status**: ✅ Working
+- **Technical Notes**: User has full control, picker selection grants access automatically
+
+#### 2. Public Files (Files with "Anyone with the link" sharing)
+- **Description**: Files with public sharing settings enabled
+- **Access Method**: Manual URL/ID input (may not appear in picker)
+- **Expected Behavior**: Should be accessible with just the link/ID
+- **Current Status**: ❓ Needs testing
+- **Technical Notes**: Public sharing means minimal auth required, may work without OAuth in some cases
+
+#### 3. Shared Files (Files shared directly with the user)
+- **Description**: Files where owner explicitly shared with user's email address
+- **Access Method**: Manual URL/ID input (picker selection currently unreliable)
+- **Expected Behavior**: Should work when user has view/edit permissions
+- **Current Status**: ⚠️ Picker selection fails with 404, manual input may work
+- **Technical Notes**:
+  - Files appear in user's "Shared with me" in Google Drive
+  - Picker can display them but `drive.file` scope may not grant access upon selection
+  - Manual URL/ID input is the recommended approach for shared files
+  - Requires proper sharing permissions from file owner
+
 ### Known Limitations
-- Shared files selected via picker may fail to load if API key is not configured
-- First-time access to a shared file requires the owner to have proper sharing permissions set
-- The `drive.file` scope does not grant access to files until they are opened/selected through the app
+- **Shared files via picker**: The `drive.file` scope has known issues granting access to pre-existing shared files selected through the picker, even with API key configured
+- **Recommended workaround**: Use manual URL/ID input for shared files instead of picker selection
+- First-time access to any file requires appropriate sharing permissions from the owner
+- The `drive.file` scope does not grant access to files until they are opened/selected through the app or accessed via manual input
 
 ## Structure
 - `src/components/auth.jsx` - Google OAuth authentication with token persistence

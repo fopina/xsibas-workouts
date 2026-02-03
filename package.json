@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:lan": "vite --host 0.0.0.0",
-    "build": "vite build",
+    "build": "vite build && cp privacy.html dist/",
     "preview": "vite preview"
   },
   "dependencies": {

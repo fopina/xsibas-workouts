@@ -258,7 +258,14 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded }) => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h2>Workout Log</h2>
         <button
-          onClick={() => setViewMode(viewMode === 'week' ? 'month' : 'week')}
+          onClick={() => {
+            const newMode = viewMode === 'week' ? 'month' : 'week';
+            if (newMode === 'month') {
+              // Set currentMonth to the month of the selected date
+              setCurrentMonth(new Date(selectedDate));
+            }
+            setViewMode(newMode);
+          }}
           style={{ fontSize: '0.9em', padding: '0.5em 1em' }}
         >
           {viewMode === 'week' ? 'Month View' : 'Week View'}
@@ -471,6 +478,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded }) => {
             {generateMonthDates(currentMonth).map((date, index) => {
               const hasWorkoutOnDate = hasWorkout(date);
               const isTodayDate = isToday(date);
+              const isSelected = isSelectedDate(date);
               const isCurrentMonth = date.getMonth() === currentMonth.getMonth();
 
               return (
@@ -483,7 +491,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded }) => {
                     borderRadius: '5px',
                     cursor: 'pointer',
                     backgroundColor: hasWorkoutOnDate ? '#2d5016' : '#333',
-                    border: isTodayDate ? '2px solid #555' : '1px solid #444',
+                    border: isSelected ? '2px solid #646cff' : isTodayDate ? '2px solid #555' : '1px solid #444',
                     opacity: isCurrentMonth ? 1 : 0.4,
                     transition: 'all 0.2s'
                   }}

@@ -23,7 +23,7 @@ const Auth = ({ onAuthChange }) => {
         console.log('Client ID:', import.meta.env.VITE_GOOGLE_CLIENT_ID);
         const client = window.google.accounts.oauth2.initTokenClient({
           client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-          scope: 'https://www.googleapis.com/auth/spreadsheets.readonly',
+          scope: 'https://www.googleapis.com/auth/drive.file',
           callback: (tokenResponse) => {
             console.log('Token response received:', tokenResponse);
             if (tokenResponse && tokenResponse.access_token) {

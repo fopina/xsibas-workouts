@@ -5,6 +5,7 @@ const gapi = window.gapi;
 
 const WorkoutLog = ({ accessToken, sheetId }) => {
   const [workouts, setWorkouts] = useState([]);
+  const [exerciseVideoMap, setExerciseVideoMap] = useState({});
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -121,15 +122,39 @@ const WorkoutLog = ({ accessToken, sheetId }) => {
           return;
         }
 
-        // 3. Make the API request
-        const range = 'WorkoutLog!A:Z';
-        
-        const response = await gapi.client.sheets.spreadsheets.values.get({
+        // 3. Fetch Exercises tab to get video link mapping
+        const exercisesResponse = await gapi.client.sheets.spreadsheets.values.get({
           spreadsheetId: sheetId,
-          range: range,
+          range: 'Exercises!A:D',
         });
 
-        const data = response.result.values;
+        const exercisesData = exercisesResponse.result.values;
+        const videoMap = {};
+        if (exercisesData && exercisesData.length > 1) {
+          // Assuming row 0 is headers, find the Exercise and VideoLink columns
+          const exerciseHeaders = exercisesData[0];
+          const exerciseNameIndex = exerciseHeaders.indexOf('Exercise');
+          const videoLinkIndex = exerciseHeaders.indexOf('VideoLink');
+
+          if (exerciseNameIndex !== -1 && videoLinkIndex !== -1) {
+            exercisesData.slice(1).forEach(row => {
+              const exerciseName = row[exerciseNameIndex];
+              const videoLink = row[videoLinkIndex];
+              if (exerciseName && videoLink) {
+                videoMap[exerciseName] = videoLink;
+              }
+            });
+          }
+        }
+        setExerciseVideoMap(videoMap);
+
+        // 4. Fetch WorkoutLog data
+        const workoutResponse = await gapi.client.sheets.spreadsheets.values.get({
+          spreadsheetId: sheetId,
+          range: 'WorkoutLog!A:Z',
+        });
+
+        const data = workoutResponse.result.values;
         if (data && data.length > 0) {
           const headers = data[0];
           const formattedData = data.slice(1).map(row => {
@@ -293,45 +318,49 @@ const WorkoutLog = ({ accessToken, sheetId }) => {
                             {sectionPrescription}
                           </p>
                         )}
-                        {exercises.map((exercise, index) => (
-                          <div key={index} style={{
-                            marginBottom: '10px',
-                            padding: '10px',
-                            backgroundColor: '#1a1a1a',
-                            borderRadius: '5px',
-                            border: '1px solid #333'
-                          }}>
-                            {Object.entries(exercise).map(([key, value]) => {
-                              // Skip Date, Section, Section Prescription, Day, and VideoLink as they're handled separately
-                              if (key === 'Date' || key === 'Section' || key === 'Section Prescription' || key === 'Day' || key === 'VideoLink' || !value) return null;
+                        {exercises.map((exercise, index) => {
+                          const videoLink = exerciseVideoMap[exercise.Exercise];
 
-                              // Special handling for Exercise field - link to video if available
-                              if (key === 'Exercise' && exercise.VideoLink) {
+                          return (
+                            <div key={index} style={{
+                              marginBottom: '10px',
+                              padding: '10px',
+                              backgroundColor: '#1a1a1a',
+                              borderRadius: '5px',
+                              border: '1px solid #333'
+                            }}>
+                              {Object.entries(exercise).map(([key, value]) => {
+                                // Skip Date, Section, Section Prescription, and Day as they're already shown
+                                if (key === 'Date' || key === 'Section' || key === 'Section Prescription' || key === 'Day' || !value) return null;
+
+                                // Special handling for Exercise field - link to video if available
+                                if (key === 'Exercise' && videoLink) {
+                                  return (
+                                    <div key={key} style={{ marginBottom: '3px' }}>
+                                      <strong>{key}:</strong>{' '}
+                                      <a
+                                        href={videoLink}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        style={{ color: '#646cff', textDecoration: 'none' }}
+                                        onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
+                                        onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
+                                      >
+                                        {value}
+                                      </a>
+                                    </div>
+                                  );
+                                }
+
                                 return (
                                   <div key={key} style={{ marginBottom: '3px' }}>
-                                    <strong>{key}:</strong>{' '}
-                                    <a
-                                      href={exercise.VideoLink}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      style={{ color: '#646cff', textDecoration: 'none' }}
-                                      onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
-                                      onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
-                                    >
-                                      {value}
-                                    </a>
+                                    <strong>{key}:</strong> {value}
                                   </div>
                                 );
-                              }
-
-                              return (
-                                <div key={key} style={{ marginBottom: '3px' }}>
-                                  <strong>{key}:</strong> {value}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ))}
+                              })}
+                            </div>
+                          );
+                        })}
                       </div>
                     );
                   });

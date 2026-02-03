@@ -25,9 +25,11 @@ Workout planner web app built with Preact and Vite that displays workout plans f
 
 ## Data Patterns
 - Google Sheet must have "WorkoutLog" tab with Date column (YYYY-MM-DD format)
+- Google Sheet must have "Exercises" tab with Exercise and VideoLink columns
+- Exercise names in WorkoutLog are mapped to VideoLink from Exercises tab
 - Workouts grouped by Section with Section Prescription shown once per section
-- UI removes redundant fields (Date, Day, Section, VideoLink) from individual exercises
-- Exercise names are linked to VideoLink column if available
+- UI removes redundant fields (Date, Day, Section) from individual exercises
+- Exercise names are clickable links to their video URLs when available
 
 ## Commands
 - `npm run dev` - Start dev server (localhost only)

@@ -221,7 +221,23 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded }) => {
   }
 
   if (error) {
-    return <p style={{ color: 'red' }}>{error}</p>;
+    return (
+      <div style={{ color: 'red' }}>
+        <p>{error}</p>
+        <p style={{ marginTop: '1em', fontSize: '0.9em' }}>
+          Can you{' '}
+          <a
+            href={`https://docs.google.com/spreadsheets/d/${sheetId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#646cff', textDecoration: 'underline' }}
+          >
+            open it in Sheets
+          </a>
+          ? If you can access it there, the sharing permissions may need to be adjusted.
+        </p>
+      </div>
+    );
   }
   
   // Helper function to check if a date has workouts

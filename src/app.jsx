@@ -156,26 +156,52 @@ export function App() {
   };
 
   const openPicker = () => {
+    console.log('Opening picker...');
     // Load the Picker API
     gapi.load('picker', () => {
-      const picker = new google.picker.PickerBuilder()
-        .addView(
-          new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS)
-            .setOwnedByMe(true)
-        )
-        .addView(
-          new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS)
-            .setOwnedByMe(false)
-        )
+      console.log('Picker API loaded');
+      const ownedView = new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS)
+        .setMimeTypes('application/vnd.google-apps.spreadsheet')
+        .setIncludeFolders(true)
+        .setMode(google.picker.DocsViewMode.LIST)
+        .setOwnedByMe(true)
+        .setLabel('My Spreadsheets');
+
+      const sharedView = new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS)
+        .setMimeTypes('application/vnd.google-apps.spreadsheet')
+        .setIncludeFolders(true)
+        .setMode(google.picker.DocsViewMode.LIST)
+        .setOwnedByMe(false)
+        .setLabel('Shared with me');
+
+      const pickerBuilder = new google.picker.PickerBuilder()
+        .addView(ownedView)
+        .addView(sharedView)
         .setOAuthToken(accessToken)
         .setCallback((data) => {
+          console.log('Picker callback - action:', data.action);
+          console.log('Picker callback - full data:', data);
           if (data.action === google.picker.Action.PICKED) {
             const doc = data.docs[0];
+            console.log('Selected document:', doc);
+            console.log('Document ID:', doc.id);
             const pickedSheetId = doc.id;
+            console.log('Calling loadSheet with ID:', pickedSheetId);
             loadSheet(pickedSheetId);
           }
-        })
-        .build();
+        });
+
+      // Add developer key if available (required for proper drive.file authorization)
+      const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
+      if (apiKey && apiKey !== 'YOUR_API_KEY_HERE') {
+        console.log('Setting developer key for picker');
+        pickerBuilder.setDeveloperKey(apiKey);
+      } else {
+        console.warn('No API key configured - shared file access may not work properly');
+      }
+
+      const picker = pickerBuilder.build();
+      console.log('Picker built, showing...');
       picker.setVisible(true);
     });
   };
@@ -443,8 +469,6 @@ export function App() {
       <footer style={{
         textAlign: 'center',
         padding: '1em',
-        marginTop: '2em',
-        borderTop: '1px solid #333',
         fontSize: '0.9em',
         color: '#666'
       }}>

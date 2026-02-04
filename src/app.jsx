@@ -469,8 +469,6 @@ export function App() {
       <footer style={{
         textAlign: 'center',
         padding: '1em',
-        marginTop: '2em',
-        borderTop: '1px solid #333',
         fontSize: '0.9em',
         color: '#666'
       }}>

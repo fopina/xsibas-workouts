@@ -85,9 +85,45 @@ The application must support three distinct file access scenarios:
 - First-time access to any file requires appropriate sharing permissions from the owner
 - The `drive.file` scope does not grant access to files until they are opened/selected through the app or accessed via manual input
 
+## Wake Lock Implementation
+
+The app uses the Screen Wake Lock API to prevent mobile devices from sleeping during workout sessions.
+
+### Implementation Details
+- **Location**: `src/hooks/useWakeLock.js` custom hook
+- **Integrated in**: `WorkoutLog` component
+- **Browser API**: `navigator.wakeLock.request('screen')`
+- **Fallback**: User-friendly notification on unsupported browsers reminding them to disable auto-lock manually
+
+### Behavior
+- Wake lock activates when viewing a workout
+- Automatically releases when:
+  - User navigates away from workout
+  - Tab becomes hidden
+  - Component unmounts
+- Re-acquires when tab becomes visible again
+
+### Browser Support
+- Chrome/Edge 84+
+- Safari 16.4+
+- Firefox: Not yet supported (as of 2025)
+
+### User Experience
+- **Supported browsers**: Wake lock silently activates, no UI changes
+- **Unsupported browsers**: Orange tip message appears at top of workout view:
+  > 💡 Tip: Disable auto-lock on your device for a better workout experience
+
+### Testing
+- Open workout on mobile device
+- Screen should not auto-lock during viewing
+- Switching tabs releases the lock
+- Returning to tab re-acquires the lock
+- Check console for "Wake Lock activated" or "Wake Lock API not supported" messages
+
 ## Structure
 - `src/components/auth.jsx` - Google OAuth authentication with token persistence
 - `src/components/workoutLog.jsx` - Calendar views (week/month) and workout display
+- `src/hooks/useWakeLock.js` - Wake Lock API hook for preventing screen sleep
 - `src/app.jsx` - Main app with sheet ID input form
 - `src/app.css` - Global styles and responsive design
 - `vite.config.js` - Vite configuration with LAN server settings

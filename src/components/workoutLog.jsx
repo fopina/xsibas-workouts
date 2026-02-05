@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'preact/hooks';
-import { useWakeLock } from '../hooks/useWakeLock';
 
 // We access gapi via the window object, as it's loaded from a script tag.
 const gapi = window.gapi;
@@ -10,9 +9,6 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded }) => {
   const [expandedVideos, setExpandedVideos] = useState({});
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
-
-  // Prevent screen sleep during workout viewing
-  const { isSupported } = useWakeLock();
 
   // Initialize selected date from URL or default to today
   const getInitialDate = () => {
@@ -275,21 +271,6 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded }) => {
 
   return (
     <div>
-      {/* Wake Lock notification for unsupported browsers */}
-      {!isSupported && (
-        <div style={{
-          backgroundColor: '#333',
-          border: '1px solid #555',
-          borderRadius: '4px',
-          padding: '0.75em',
-          marginBottom: '1em',
-          fontSize: '0.9em',
-          color: '#ffa726'
-        }}>
-          💡 Tip: Disable auto-lock on your device for a better workout experience
-        </div>
-      )}
-
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h2>Workout Log</h2>
         <button

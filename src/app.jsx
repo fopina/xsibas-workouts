@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'preact/hooks';
 import Auth from './components/auth';
 import WorkoutLog from './components/workoutLog';
+import { useWakeLock } from './hooks/useWakeLock';
 import './app.css';
 
 const gapi = window.gapi;
@@ -13,6 +14,9 @@ export function App() {
   const [sheetId, setSheetId] = useState('');
   const [inputValue, setInputValue] = useState('');
   const [showSheetSelector, setShowSheetSelector] = useState(false);
+
+  // Prevent screen sleep throughout the app
+  const { isSupported } = useWakeLock();
 
   // Extract sheet ID from Google Sheets URL or return as-is if already an ID
   const extractSheetId = (input) => {
@@ -451,6 +455,21 @@ export function App() {
         </div>
       </header>
       <main>
+        {/* Wake Lock notification for unsupported browsers */}
+        {!isSupported && (
+          <div style={{
+            backgroundColor: '#333',
+            border: '1px solid #555',
+            borderRadius: '4px',
+            padding: '0.75em',
+            marginBottom: '1em',
+            fontSize: '0.9em',
+            color: '#ffa726'
+          }}>
+            💡 Tip: Disable auto-lock on your device for a better workout experience
+          </div>
+        )}
+
         {showSheetSelector || !sheetId ? (
           <SheetSelector />
         ) : accessToken && isGapiLoaded ? (

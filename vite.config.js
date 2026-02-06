@@ -8,9 +8,9 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     allowedHosts: true,
-    https: {
+    https: fs.existsSync('.cert/key.pem') && fs.existsSync('.cert/cert.pem') ? {
       key: fs.readFileSync('.cert/key.pem'),
       cert: fs.readFileSync('.cert/cert.pem'),
-    }
+    } : false
   }
 })

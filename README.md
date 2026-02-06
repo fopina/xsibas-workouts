@@ -16,6 +16,24 @@ To run this project, you will need to create a `.env` file in the root of the pr
 
 *   `VITE_GOOGLE_CLIENT_ID`: Your Google Cloud project's OAuth 2.0 Client ID.
 
+## Google OAuth Scope
+
+This application uses the `https://www.googleapis.com/auth/spreadsheets` scope, which is a **restricted scope** requiring Google verification.
+
+**Why spreadsheets instead of drive.file:**
+
+While `drive.file` is a non-sensitive scope with simpler verification, it does **not grant access to the Google Sheets API** for files selected via the picker or provided by direct link. The `drive.file` scope only allows reading file metadata, not the actual spreadsheet content through the Sheets API.
+
+The full `spreadsheets` scope (not just readonly) is required because the app allows users to update workout notes directly in their spreadsheets.
+
+**Privacy and Security:**
+
+The application **only accesses spreadsheets that users explicitly provide** either by:
+- Direct sheet URL/ID input
+- Selection through the Google Picker interface
+
+The code can be reviewed to verify that it only opens specific files provided by the user and does not access any other spreadsheets in the user's Google Drive.
+
 ## Getting Started
 
 1.  Install the dependencies:

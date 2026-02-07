@@ -200,6 +200,10 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded }) => {
             headers.forEach((header, index) => {
               workout[header] = row[index] || ''; // Ensure empty cells are handled
             });
+            // Ensure every workout has a Notes field even if column doesn't exist
+            if (!('Notes' in workout)) {
+              workout.Notes = '';
+            }
             return workout;
           });
           setWorkouts(formattedData);

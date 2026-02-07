@@ -532,8 +532,8 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded }) => {
 
                                 // Special handling for Notes field - make it editable
                                 if (key === 'Notes') {
-                                  const isEditing = editingNotes[exerciseKey];
-                                  const isSaving = savingNotes[exerciseKey];
+                                  const isEditing = exerciseKey in editingNotes;
+                                  const isSaving = exerciseKey in savingNotes;
 
                                   return (
                                     <div key={key} style={{ marginTop: '10px', marginBottom: '5px' }}>

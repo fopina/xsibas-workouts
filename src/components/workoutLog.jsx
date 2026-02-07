@@ -372,7 +372,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded }) => {
   };
 
   return (
-    <div>
+    <div style={{ maxWidth: '800px', margin: '0 auto', width: '100%' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h2>Workout Log</h2>
         <button

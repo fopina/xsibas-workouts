@@ -109,7 +109,7 @@ export function App() {
     if (extractedId) {
       setSheetId(extractedId);
       saveSheetToHistory(extractedId);
-      navigate(`/app?sheet=${extractedId}`);
+      navigate(`/workout?sheet=${extractedId}`);
       setShowSheetSelector(false);
       setInputValue('');
     }
@@ -118,13 +118,13 @@ export function App() {
   const loadSheet = (sheetIdToLoad) => {
     setSheetId(sheetIdToLoad);
     saveSheetToHistory(sheetIdToLoad);
-    navigate(`/app?sheet=${sheetIdToLoad}`);
+    navigate(`/workout?sheet=${sheetIdToLoad}`);
     setShowSheetSelector(false);
   };
 
   const unloadSheet = () => {
     setSheetId('');
-    navigate('/app');
+    navigate('/workout');
   };
 
   const deleteSheetFromHistory = (sheetIdToDelete) => {
@@ -145,10 +145,10 @@ export function App() {
       saveSheetToHistory(urlSheetId);
     }
 
-    // Handle initial route - redirect to /app if logged in and on root
+    // Handle initial route - redirect to /workout if logged in and on root
     const storedToken = localStorage.getItem('google_access_token');
     if (window.location.pathname === '/' && storedToken && !urlSheetId) {
-      navigate('/app');
+      navigate('/workout');
     }
   }, []);
 
@@ -442,10 +442,10 @@ export function App() {
     );
   };
 
-  // Redirect to /app after successful login from landing page
+  // Redirect to /workout after successful login from landing page
   useEffect(() => {
     if (accessToken && currentPath === '/') {
-      navigate('/app');
+      navigate('/workout');
     }
   }, [accessToken, currentPath]);
 
@@ -455,7 +455,7 @@ export function App() {
       <div class="app-container">
         <main>
           <Landing
-            onGetStarted={() => navigate('/app')}
+            onGetStarted={() => navigate('/workout')}
             isLoggedIn={!!accessToken}
           />
         </main>
@@ -473,7 +473,7 @@ export function App() {
     );
   }
 
-  // Show main app for /app path
+  // Show main app for /workout path
   return (
     <div class="app-container">
       <header>

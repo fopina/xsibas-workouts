@@ -9,6 +9,8 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded }) => {
   const [expandedVideos, setExpandedVideos] = useState({});
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [editingNotes, setEditingNotes] = useState({}); // Track which notes are being edited
+  const [savingNotes, setSavingNotes] = useState({}); // Track which notes are being saved
 
   // Initialize selected date from URL or default to today
   const getInitialDate = () => {
@@ -269,6 +271,75 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded }) => {
     return date.toDateString() === selectedDate.toDateString();
   };
 
+  // Function to update notes in the spreadsheet
+  const updateNotes = async (rowIndex, newNotes, exerciseKey) => {
+    setSavingNotes(prev => ({ ...prev, [exerciseKey]: true }));
+
+    try {
+      // Find the Notes column index
+      const response = await gapi.client.sheets.spreadsheets.values.get({
+        spreadsheetId: sheetId,
+        range: 'WorkoutLog!A1:Z1',
+      });
+
+      const headers = response.result.values[0];
+      let notesColumnIndex = headers.indexOf('Notes');
+
+      // If Notes column doesn't exist, we need to add it
+      if (notesColumnIndex === -1) {
+        notesColumnIndex = headers.length;
+        // Add Notes header if it doesn't exist
+        await gapi.client.sheets.spreadsheets.values.update({
+          spreadsheetId: sheetId,
+          range: `WorkoutLog!${String.fromCharCode(65 + notesColumnIndex)}1`,
+          valueInputOption: 'RAW',
+          resource: {
+            values: [['Notes']]
+          }
+        });
+      }
+
+      // Convert column index to letter (A, B, C, ...)
+      const columnLetter = String.fromCharCode(65 + notesColumnIndex);
+      // Row index in sheet is rowIndex + 2 (1 for header, 1 for 0-based to 1-based)
+      const cellRange = `WorkoutLog!${columnLetter}${rowIndex + 2}`;
+
+      // Update the notes cell
+      await gapi.client.sheets.spreadsheets.values.update({
+        spreadsheetId: sheetId,
+        range: cellRange,
+        valueInputOption: 'RAW',
+        resource: {
+          values: [[newNotes]]
+        }
+      });
+
+      // Update local state
+      setWorkouts(prev => {
+        const updated = [...prev];
+        updated[rowIndex] = { ...updated[rowIndex], Notes: newNotes };
+        return updated;
+      });
+
+      // Clear editing state
+      setEditingNotes(prev => {
+        const updated = { ...prev };
+        delete updated[exerciseKey];
+        return updated;
+      });
+
+    } catch (err) {
+      console.error("Error updating notes:", err);
+      alert(`Error updating notes: ${err.result?.error?.message || err.message}`);
+    } finally {
+      setSavingNotes(prev => {
+        const updated = { ...prev };
+        delete updated[exerciseKey];
+        return updated;
+      });
+    }
+  };
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -383,6 +454,13 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded }) => {
                           const exerciseKey = `${sectionName}-${exerciseIndex}`;
                           const showVideo = expandedVideos[exerciseKey];
 
+                          // Find the row index in the original workouts array for this exercise
+                          const rowIndex = workouts.findIndex(w =>
+                            w.Date === exercise.Date &&
+                            w.Exercise === exercise.Exercise &&
+                            w.Section === exercise.Section
+                          );
+
                           return (
                             <div key={exerciseIndex} style={{
                               marginBottom: '10px',
@@ -393,7 +471,9 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded }) => {
                             }}>
                               {Object.entries(exercise).map(([key, value]) => {
                                 // Skip Date, Section, Section Prescription, and Day as they're already shown
-                                if (key === 'Date' || key === 'Section' || key === 'Section Prescription' || key === 'Day' || !value) return null;
+                                // Don't skip empty Notes field - we want to show it for editing
+                                if (key === 'Date' || key === 'Section' || key === 'Section Prescription' || key === 'Day') return null;
+                                if (!value && key !== 'Notes') return null;
 
                                 // Special handling for Exercise field - show with video toggle if available
                                 if (key === 'Exercise' && videoLink) {
@@ -440,6 +520,110 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded }) => {
                                             allowFullScreen
                                             style={{ borderRadius: '5px', maxWidth: '560px' }}
                                           ></iframe>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                }
+
+                                // Special handling for Notes field - make it editable
+                                if (key === 'Notes') {
+                                  const isEditing = editingNotes[exerciseKey];
+                                  const isSaving = savingNotes[exerciseKey];
+
+                                  return (
+                                    <div key={key} style={{ marginTop: '10px', marginBottom: '5px' }}>
+                                      <strong>Notes:</strong>
+                                      {isEditing ? (
+                                        <div style={{ marginTop: '5px' }}>
+                                          <textarea
+                                            value={editingNotes[exerciseKey] || ''}
+                                            onChange={(e) => setEditingNotes(prev => ({
+                                              ...prev,
+                                              [exerciseKey]: e.target.value
+                                            }))}
+                                            style={{
+                                              width: '100%',
+                                              minHeight: '60px',
+                                              padding: '8px',
+                                              backgroundColor: '#2a2a2a',
+                                              color: '#fff',
+                                              border: '1px solid #444',
+                                              borderRadius: '4px',
+                                              fontSize: '0.9em',
+                                              fontFamily: 'inherit',
+                                              resize: 'vertical'
+                                            }}
+                                            placeholder="Add your notes here..."
+                                          />
+                                          <div style={{ marginTop: '5px', display: 'flex', gap: '5px' }}>
+                                            <button
+                                              onClick={() => updateNotes(rowIndex, editingNotes[exerciseKey] || '', exerciseKey)}
+                                              disabled={isSaving}
+                                              style={{
+                                                padding: '5px 10px',
+                                                fontSize: '0.85em',
+                                                backgroundColor: '#646cff',
+                                                color: '#fff',
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                cursor: isSaving ? 'not-allowed' : 'pointer',
+                                                opacity: isSaving ? 0.6 : 1
+                                              }}
+                                            >
+                                              {isSaving ? 'Saving...' : 'Save'}
+                                            </button>
+                                            <button
+                                              onClick={() => setEditingNotes(prev => {
+                                                const updated = { ...prev };
+                                                delete updated[exerciseKey];
+                                                return updated;
+                                              })}
+                                              disabled={isSaving}
+                                              style={{
+                                                padding: '5px 10px',
+                                                fontSize: '0.85em',
+                                                backgroundColor: '#333',
+                                                color: '#aaa',
+                                                border: '1px solid #444',
+                                                borderRadius: '4px',
+                                                cursor: isSaving ? 'not-allowed' : 'pointer'
+                                              }}
+                                            >
+                                              Cancel
+                                            </button>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <div style={{ marginTop: '5px' }}>
+                                          <div style={{
+                                            padding: '8px',
+                                            backgroundColor: '#2a2a2a',
+                                            borderRadius: '4px',
+                                            minHeight: '30px',
+                                            color: value ? '#fff' : '#666',
+                                            fontStyle: value ? 'normal' : 'italic'
+                                          }}>
+                                            {value || 'No notes yet'}
+                                          </div>
+                                          <button
+                                            onClick={() => setEditingNotes(prev => ({
+                                              ...prev,
+                                              [exerciseKey]: value || ''
+                                            }))}
+                                            style={{
+                                              marginTop: '5px',
+                                              padding: '4px 8px',
+                                              fontSize: '0.8em',
+                                              backgroundColor: '#333',
+                                              color: '#aaa',
+                                              border: '1px solid #444',
+                                              borderRadius: '3px',
+                                              cursor: 'pointer'
+                                            }}
+                                          >
+                                            {value ? 'Edit Notes' : 'Add Notes'}
+                                          </button>
                                         </div>
                                       )}
                                     </div>

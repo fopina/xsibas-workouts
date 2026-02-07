@@ -7,7 +7,7 @@ const EXPECTED_SCHEMA = {
   sheets: ['Exercises', 'WorkoutLog'],
   headers: {
     Exercises: ['Exercise', 'VideoLink'],
-    WorkoutLog: ['Date', 'Day', 'Section', 'Section Prescription', 'Exercise', 'Notes']
+    WorkoutLog: ['Date', 'Section', 'Section Prescription', 'Exercise', 'Notes']
   }
 };
 

@@ -148,11 +148,16 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded }) => {
         }
 
         // 2.5. Validate spreadsheet schema
-        const validation = await validateSpreadsheetSchema(gapi, sheetId);
-        if (!validation.valid) {
-          setError(formatValidationErrors(validation.errors));
-          setLoading(false);
-          return;
+        try {
+          const validation = await validateSpreadsheetSchema(gapi, sheetId);
+          if (!validation.valid) {
+            setError(formatValidationErrors(validation.errors));
+            setLoading(false);
+            return;
+          }
+        } catch (err) {
+          // Let auth/permission errors from validation bubble up to main error handler
+          throw err;
         }
 
         // 3. Fetch spreadsheet metadata to get title

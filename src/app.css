@@ -58,6 +58,9 @@ main {
   flex: 1;
   padding-top: 80px;
   padding-bottom: 60px;
+  max-width: 800px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 /* Remove padding only for landing page (no header element) */

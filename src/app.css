@@ -60,8 +60,7 @@ main {
   padding-bottom: 60px;
 }
 
-/* Remove padding when header is not fixed (landing page) */
-.app-container:has(header:not([style*="position: fixed"])) main,
+/* Remove padding only for landing page (no header element) */
 .app-container:not(:has(header)) main {
   padding-top: 0;
   padding-bottom: 0;

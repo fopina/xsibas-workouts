@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:lan": "vite --config vite.config.lan.js",
+    "dev:lan": "mkdir -p .cert && test -f .cert/key.pem || openssl req -x509 -newkey rsa:2048 -keyout .cert/key.pem -out .cert/cert.pem -days 365 -nodes -subj '/CN=localhost' && vite --config vite.config.lan.js",
     "build": "vite build",
     "preview": "vite preview"
   },

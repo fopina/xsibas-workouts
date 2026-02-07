@@ -12,7 +12,7 @@ const Landing = ({ onGetStarted }) => {
       }}>
         <img
           src="/xsibas300.png"
-          alt="XSibas Logo"
+          alt="Workout Planner Logo"
           style={{
             width: '100px',
             height: '100px',
@@ -27,7 +27,7 @@ const Landing = ({ onGetStarted }) => {
         marginBottom: '0.5em',
         color: '#8bc34a'
       }}>
-        XSibas Workout Planner
+        Workout Planner
       </h1>
 
       {/* Tagline */}

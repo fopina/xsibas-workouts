@@ -430,19 +430,22 @@ export function App() {
     );
   };
 
-  // Hide landing page if user is already logged in or has clicked Get Started
+  // Show landing page on first load if not logged in
   useEffect(() => {
-    if (accessToken) {
+    // Only auto-hide landing on first login, not on page refresh with existing token
+    const hasSeenApp = localStorage.getItem('has_seen_app');
+    if (accessToken && !hasSeenApp) {
       setShowLanding(false);
+      localStorage.setItem('has_seen_app', 'true');
     }
   }, [accessToken]);
 
   // Show landing page
-  if (showLanding && !accessToken) {
+  if (showLanding) {
     return (
       <div class="app-container">
         <main>
-          <Landing onGetStarted={() => setShowLanding(false)} />
+          <Landing onGetStarted={() => setShowLanding(false)} isLoggedIn={!!accessToken} />
         </main>
         <footer style={{
           textAlign: 'center',

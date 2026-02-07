@@ -1,4 +1,4 @@
-const Landing = ({ onGetStarted }) => {
+const Landing = ({ onGetStarted, isLoggedIn }) => {
   return (
     <div style={{
       maxWidth: '800px',
@@ -135,7 +135,7 @@ const Landing = ({ onGetStarted }) => {
           e.target.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.3)';
         }}
       >
-        Get Started
+        {isLoggedIn ? 'Go to App' : 'Get Started'}
       </button>
 
       {/* Privacy Note */}

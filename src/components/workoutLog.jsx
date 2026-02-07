@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'preact/hooks';
+import { validateSpreadsheetSchema, formatValidationErrors } from '../utils/schemaValidator';
 
 // We access gapi via the window object, as it's loaded from a script tag.
 const gapi = window.gapi;
@@ -139,9 +140,17 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded }) => {
             setLoading(false);
             return;
         }
-        
+
         if (!gapi.client.sheets) {
           setError('The Google Sheets API is not available. Please check your browser extensions.');
+          setLoading(false);
+          return;
+        }
+
+        // 2.5. Validate spreadsheet schema
+        const validation = await validateSpreadsheetSchema(gapi, sheetId);
+        if (!validation.valid) {
+          setError(formatValidationErrors(validation.errors));
           setLoading(false);
           return;
         }
@@ -212,7 +221,15 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded }) => {
         }
       } catch (err) {
         console.error("Error fetching sheet data:", err);
-        setError(`Error fetching workout data: ${err.result?.error?.message || err.message}`);
+        const errorMessage = err.result?.error?.message || err.message || '';
+        const errorStatus = err.result?.error?.status || err.status || '';
+
+        // Check for authentication errors
+        if (errorStatus === 'UNAUTHENTICATED' || errorMessage.includes('Invalid Credentials') || errorMessage.includes('invalid authentication')) {
+          setError('Login expired. Login again');
+        } else {
+          setError(`Error fetching workout data: ${errorMessage}`);
+        }
       } finally {
         setLoading(false);
       }
@@ -227,21 +244,26 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded }) => {
   }
 
   if (error) {
+    // Don't show the "open it in Sheets" link for authentication errors
+    const isAuthError = error === 'Login expired. Login again';
+
     return (
       <div style={{ color: 'red' }}>
         <p>{error}</p>
-        <p style={{ marginTop: '1em', fontSize: '0.9em' }}>
-          Can you{' '}
-          <a
-            href={`https://docs.google.com/spreadsheets/d/${sheetId}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color: '#646cff', textDecoration: 'underline' }}
-          >
-            open it in Sheets
-          </a>
-          ? If you can access it there, the sharing permissions may need to be adjusted.
-        </p>
+        {!isAuthError && (
+          <p style={{ marginTop: '1em', fontSize: '0.9em' }}>
+            Can you{' '}
+            <a
+              href={`https://docs.google.com/spreadsheets/d/${sheetId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: '#646cff', textDecoration: 'underline' }}
+            >
+              open it in Sheets
+            </a>
+            ? If you can access it there, the sharing permissions may need to be adjusted.
+          </p>
+        )}
       </div>
     );
   }
@@ -345,7 +367,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded }) => {
   };
 
   return (
-    <div>
+    <div style={{ maxWidth: '800px', margin: '0 auto', width: '100%' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h2>Workout Log</h2>
         <button

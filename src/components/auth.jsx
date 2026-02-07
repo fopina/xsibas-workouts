@@ -57,7 +57,10 @@ const Auth = ({ onAuthChange }) => {
       // Prompt the user to select a Google Account and ask for consent to share their data
       // when establishing a new session.
       console.log('Requesting access token...');
-      tokenClient.requestAccessToken();
+      tokenClient.requestAccessToken({
+        prompt: 'consent',
+        include_granted_scopes: false
+      });
     } else {
       console.error('Token client not initialized');
     }

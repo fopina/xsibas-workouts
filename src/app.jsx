@@ -144,12 +144,6 @@ export function App() {
       setSheetId(urlSheetId);
       saveSheetToHistory(urlSheetId);
     }
-
-    // Handle initial route - redirect to /workout if logged in and on root
-    const storedToken = localStorage.getItem('google_access_token');
-    if (window.location.pathname === '/' && storedToken && !urlSheetId) {
-      navigate('/workout');
-    }
   }, []);
 
   useEffect(() => {
@@ -441,13 +435,6 @@ export function App() {
       </div>
     );
   };
-
-  // Redirect to /workout after successful login from landing page
-  useEffect(() => {
-    if (accessToken && currentPath === '/') {
-      navigate('/workout');
-    }
-  }, [accessToken, currentPath]);
 
   // Show landing page for root path
   if (currentPath === '/') {

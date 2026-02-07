@@ -14,12 +14,22 @@ export function App() {
   const [sheetId, setSheetId] = useState('');
   const [inputValue, setInputValue] = useState('');
   const [showSheetSelector, setShowSheetSelector] = useState(false);
-  const [showLanding, setShowLanding] = useState(() => {
-    // Start with landing page hidden if user is already logged in (has token in localStorage)
-    const storedToken = localStorage.getItem('google_access_token');
-    return !storedToken;
-  });
-  const [landingExplicitlyRequested, setLandingExplicitlyRequested] = useState(false);
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+
+  // Simple router: listen to popstate and update current path
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Navigate function
+  const navigate = (path) => {
+    window.history.pushState({}, '', path);
+    setCurrentPath(path);
+  };
 
   // Extract sheet ID from Google Sheets URL or return as-is if already an ID
   const extractSheetId = (input) => {
@@ -99,10 +109,7 @@ export function App() {
     if (extractedId) {
       setSheetId(extractedId);
       saveSheetToHistory(extractedId);
-      // Update URL with sheet parameter
-      const newUrl = new URL(window.location);
-      newUrl.searchParams.set('sheet', extractedId);
-      window.history.pushState({}, '', newUrl);
+      navigate(`/app?sheet=${extractedId}`);
       setShowSheetSelector(false);
       setInputValue('');
     }
@@ -111,19 +118,13 @@ export function App() {
   const loadSheet = (sheetIdToLoad) => {
     setSheetId(sheetIdToLoad);
     saveSheetToHistory(sheetIdToLoad);
-    // Update URL with sheet parameter
-    const newUrl = new URL(window.location);
-    newUrl.searchParams.set('sheet', sheetIdToLoad);
-    window.history.pushState({}, '', newUrl);
+    navigate(`/app?sheet=${sheetIdToLoad}`);
     setShowSheetSelector(false);
   };
 
   const unloadSheet = () => {
     setSheetId('');
-    // Remove sheet parameter from URL
-    const newUrl = new URL(window.location);
-    newUrl.searchParams.delete('sheet');
-    window.history.pushState({}, '', newUrl);
+    navigate('/app');
   };
 
   const deleteSheetFromHistory = (sheetIdToDelete) => {
@@ -142,6 +143,12 @@ export function App() {
     if (urlSheetId) {
       setSheetId(urlSheetId);
       saveSheetToHistory(urlSheetId);
+    }
+
+    // Handle initial route - redirect to /app if logged in and on root
+    const storedToken = localStorage.getItem('google_access_token');
+    if (window.location.pathname === '/' && storedToken && !urlSheetId) {
+      navigate('/app');
     }
   }, []);
 
@@ -435,23 +442,20 @@ export function App() {
     );
   };
 
-  // Auto-hide landing page after successful login (but not if user explicitly requested it)
+  // Redirect to /app after successful login from landing page
   useEffect(() => {
-    if (accessToken && showLanding && !landingExplicitlyRequested) {
-      setShowLanding(false);
+    if (accessToken && currentPath === '/') {
+      navigate('/app');
     }
-  }, [accessToken, showLanding, landingExplicitlyRequested]);
+  }, [accessToken, currentPath]);
 
-  // Show landing page
-  if (showLanding) {
+  // Show landing page for root path
+  if (currentPath === '/') {
     return (
       <div class="app-container">
         <main>
           <Landing
-            onGetStarted={() => {
-              setShowLanding(false);
-              setLandingExplicitlyRequested(false);
-            }}
+            onGetStarted={() => navigate('/app')}
             isLoggedIn={!!accessToken}
           />
         </main>
@@ -469,16 +473,14 @@ export function App() {
     );
   }
 
+  // Show main app for /app path
   return (
     <div class="app-container">
       <header>
         <img
           src="/xsibas300.png"
           alt="Workout Planner"
-          onClick={() => {
-            setShowLanding(true);
-            setLandingExplicitlyRequested(true);
-          }}
+          onClick={() => navigate('/')}
           style={{
             height: '40px',
             width: 'auto',

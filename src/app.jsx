@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'preact/hooks';
 import Auth from './components/auth';
 import WorkoutLog from './components/workoutLog';
+import Landing from './components/landing';
 import './app.css';
 
 const gapi = window.gapi;
@@ -13,6 +14,22 @@ export function App() {
   const [sheetId, setSheetId] = useState('');
   const [inputValue, setInputValue] = useState('');
   const [showSheetSelector, setShowSheetSelector] = useState(false);
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+
+  // Simple router: listen to popstate and update current path
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Navigate function
+  const navigate = (path) => {
+    window.history.pushState({}, '', path);
+    setCurrentPath(path);
+  };
 
   // Extract sheet ID from Google Sheets URL or return as-is if already an ID
   const extractSheetId = (input) => {
@@ -92,10 +109,7 @@ export function App() {
     if (extractedId) {
       setSheetId(extractedId);
       saveSheetToHistory(extractedId);
-      // Update URL with sheet parameter
-      const newUrl = new URL(window.location);
-      newUrl.searchParams.set('sheet', extractedId);
-      window.history.pushState({}, '', newUrl);
+      navigate(`/workout?sheet=${extractedId}`);
       setShowSheetSelector(false);
       setInputValue('');
     }
@@ -104,19 +118,13 @@ export function App() {
   const loadSheet = (sheetIdToLoad) => {
     setSheetId(sheetIdToLoad);
     saveSheetToHistory(sheetIdToLoad);
-    // Update URL with sheet parameter
-    const newUrl = new URL(window.location);
-    newUrl.searchParams.set('sheet', sheetIdToLoad);
-    window.history.pushState({}, '', newUrl);
+    navigate(`/workout?sheet=${sheetIdToLoad}`);
     setShowSheetSelector(false);
   };
 
   const unloadSheet = () => {
     setSheetId('');
-    // Remove sheet parameter from URL
-    const newUrl = new URL(window.location);
-    newUrl.searchParams.delete('sheet');
-    window.history.pushState({}, '', newUrl);
+    navigate('/workout');
   };
 
   const deleteSheetFromHistory = (sheetIdToDelete) => {
@@ -428,10 +436,45 @@ export function App() {
     );
   };
 
+  // Show landing page for root path
+  if (currentPath === '/') {
+    return (
+      <div class="app-container">
+        <main>
+          <Landing
+            onGetStarted={() => navigate('/workout')}
+            isLoggedIn={!!accessToken}
+          />
+        </main>
+        <footer style={{
+          textAlign: 'center',
+          padding: '1em',
+          fontSize: '0.9em',
+          color: '#666'
+        }}>
+          <a href="/privacy/" style={{ color: '#8bc34a', textDecoration: 'none' }}>
+            Privacy Policy
+          </a>
+        </footer>
+      </div>
+    );
+  }
+
+  // Show main app for /workout path
   return (
     <div class="app-container">
       <header>
-        <h1>XSibas</h1>
+        <img
+          src="/xsibas300.png"
+          alt="Workout Planner"
+          onClick={() => navigate('/')}
+          style={{
+            height: '40px',
+            width: 'auto',
+            objectFit: 'contain',
+            cursor: 'pointer'
+          }}
+        />
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {sheetId && (
             <button

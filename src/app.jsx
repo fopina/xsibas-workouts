@@ -222,7 +222,7 @@ export function App() {
       .sort(([, a], [, b]) => new Date(b.lastOpened) - new Date(a.lastOpened));
 
     return (
-      <div style={{ maxWidth: '600px', margin: '0 auto', width: '100%' }}>
+      <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5em' }}>
           <h3 style={{ fontSize: '1.3em', margin: 0 }}>Select Workout Sheet</h3>
           {sheetId && (

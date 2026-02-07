@@ -1,8 +1,6 @@
 const Landing = ({ onGetStarted, isLoggedIn }) => {
   return (
     <div style={{
-      maxWidth: '800px',
-      margin: '0 auto',
       padding: '2em 1em',
       textAlign: 'center'
     }}>

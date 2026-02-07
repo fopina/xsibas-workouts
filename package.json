@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:lan": "vite --host 0.0.0.0 --config vite.config.https.js",
+    "dev:lan": "vite --config vite.config.lan.js",
     "build": "vite build",
     "preview": "vite preview"
   },

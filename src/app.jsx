@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'preact/hooks';
 import Auth from './components/auth';
 import WorkoutLog from './components/workoutLog';
+import Landing from './components/landing';
 import './app.css';
 
 const gapi = window.gapi;
@@ -13,6 +14,7 @@ export function App() {
   const [sheetId, setSheetId] = useState('');
   const [inputValue, setInputValue] = useState('');
   const [showSheetSelector, setShowSheetSelector] = useState(false);
+  const [showLanding, setShowLanding] = useState(true);
 
   // Extract sheet ID from Google Sheets URL or return as-is if already an ID
   const extractSheetId = (input) => {
@@ -427,6 +429,34 @@ export function App() {
       </div>
     );
   };
+
+  // Hide landing page if user is already logged in or has clicked Get Started
+  useEffect(() => {
+    if (accessToken) {
+      setShowLanding(false);
+    }
+  }, [accessToken]);
+
+  // Show landing page
+  if (showLanding && !accessToken) {
+    return (
+      <div class="app-container">
+        <main>
+          <Landing onGetStarted={() => setShowLanding(false)} />
+        </main>
+        <footer style={{
+          textAlign: 'center',
+          padding: '1em',
+          fontSize: '0.9em',
+          color: '#666'
+        }}>
+          <a href="/privacy/" style={{ color: '#8bc34a', textDecoration: 'none' }}>
+            Privacy Policy
+          </a>
+        </footer>
+      </div>
+    );
+  }
 
   return (
     <div class="app-container">

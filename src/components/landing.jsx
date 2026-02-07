@@ -8,10 +8,17 @@ const Landing = ({ onGetStarted }) => {
     }}>
       {/* App Icon/Logo */}
       <div style={{
-        fontSize: '4em',
         marginBottom: '0.5em'
       }}>
-        💪
+        <img
+          src="/xsibas300.png"
+          alt="XSibas Logo"
+          style={{
+            width: '100px',
+            height: '100px',
+            objectFit: 'contain'
+          }}
+        />
       </div>
 
       {/* App Title */}

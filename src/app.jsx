@@ -464,10 +464,12 @@ export function App() {
         <img
           src="/xsibas300.png"
           alt="Workout Planner"
+          onClick={() => setShowLanding(true)}
           style={{
             height: '40px',
             width: 'auto',
-            objectFit: 'contain'
+            objectFit: 'contain',
+            cursor: 'pointer'
           }}
         />
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>

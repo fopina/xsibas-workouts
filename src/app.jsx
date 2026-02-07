@@ -461,7 +461,15 @@ export function App() {
   return (
     <div class="app-container">
       <header>
-        <h1>XSibas</h1>
+        <img
+          src="/xsibas300.png"
+          alt="Workout Planner"
+          style={{
+            height: '40px',
+            width: 'auto',
+            objectFit: 'contain'
+          }}
+        />
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {sheetId && (
             <button

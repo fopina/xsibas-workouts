@@ -14,7 +14,12 @@ export function App() {
   const [sheetId, setSheetId] = useState('');
   const [inputValue, setInputValue] = useState('');
   const [showSheetSelector, setShowSheetSelector] = useState(false);
-  const [showLanding, setShowLanding] = useState(true);
+  const [showLanding, setShowLanding] = useState(() => {
+    // Start with landing page hidden if user is already logged in (has token in localStorage)
+    const storedToken = localStorage.getItem('google_access_token');
+    return !storedToken;
+  });
+  const [landingExplicitlyRequested, setLandingExplicitlyRequested] = useState(false);
 
   // Extract sheet ID from Google Sheets URL or return as-is if already an ID
   const extractSheetId = (input) => {
@@ -430,22 +435,25 @@ export function App() {
     );
   };
 
-  // Show landing page on first load if not logged in
+  // Auto-hide landing page after successful login (but not if user explicitly requested it)
   useEffect(() => {
-    // Only auto-hide landing on first login, not on page refresh with existing token
-    const hasSeenApp = localStorage.getItem('has_seen_app');
-    if (accessToken && !hasSeenApp) {
+    if (accessToken && showLanding && !landingExplicitlyRequested) {
       setShowLanding(false);
-      localStorage.setItem('has_seen_app', 'true');
     }
-  }, [accessToken]);
+  }, [accessToken, showLanding, landingExplicitlyRequested]);
 
   // Show landing page
   if (showLanding) {
     return (
       <div class="app-container">
         <main>
-          <Landing onGetStarted={() => setShowLanding(false)} isLoggedIn={!!accessToken} />
+          <Landing
+            onGetStarted={() => {
+              setShowLanding(false);
+              setLandingExplicitlyRequested(false);
+            }}
+            isLoggedIn={!!accessToken}
+          />
         </main>
         <footer style={{
           textAlign: 'center',
@@ -467,7 +475,10 @@ export function App() {
         <img
           src="/xsibas300.png"
           alt="Workout Planner"
-          onClick={() => setShowLanding(true)}
+          onClick={() => {
+            setShowLanding(true);
+            setLandingExplicitlyRequested(true);
+          }}
           style={{
             height: '40px',
             width: 'auto',

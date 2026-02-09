@@ -2,6 +2,7 @@ import { useState, useEffect } from 'preact/hooks';
 import Auth from './components/auth';
 import WorkoutLog from './components/workoutLog';
 import Landing from './components/landing';
+import { useWakeLock } from './hooks/useWakeLock';
 import './app.css';
 
 const gapi = window.gapi;
@@ -30,6 +31,11 @@ export function App() {
     window.history.pushState({}, '', path);
     setCurrentPath(path);
   };
+
+  // Prevent screen sleep throughout the app
+  console.log('[App] Calling useWakeLock hook');
+  const { isSupported, isActive, isEnabled, toggleWakeLock } = useWakeLock();
+  console.log('[App] useWakeLock returned - isSupported:', isSupported, 'isActive:', isActive, 'isEnabled:', isEnabled);
 
   // Extract sheet ID from Google Sheets URL or return as-is if already an ID
   const extractSheetId = (input) => {
@@ -494,6 +500,80 @@ export function App() {
         </div>
       </header>
       <main>
+        {/* Wake Lock control banner - always visible */}
+        {!isSupported ? (
+          <div style={{
+            backgroundColor: '#2a1a1a',
+            border: '1px solid #a44',
+            borderRadius: '4px',
+            padding: '0.75em',
+            marginBottom: '1em',
+            fontSize: '0.9em',
+            color: '#ff6b6b',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '1em'
+          }}>
+            <span>⚠️ Screen auto-lock cannot be disabled - adjust device settings for better workout experience</span>
+          </div>
+        ) : (
+          <div style={{
+            backgroundColor: isActive ? '#1a2a1a' : '#2a2a1a',
+            border: `1px solid ${isActive ? '#4a7c4a' : '#555'}`,
+            borderRadius: '4px',
+            padding: '0.75em',
+            marginBottom: '1em',
+            fontSize: '0.9em',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '1em'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5em' }}>
+              <span style={{ color: isActive ? '#8bc34a' : '#999' }}>
+                {isActive ? '✓' : '○'} Keep screen awake
+              </span>
+              {isEnabled && !isActive && (
+                <span style={{ color: '#666', fontSize: '0.85em' }}>(activating...)</span>
+              )}
+            </div>
+            <label style={{
+              display: 'flex',
+              alignItems: 'center',
+              cursor: 'pointer',
+              gap: '0.5em'
+            }}>
+              <span style={{ fontSize: '0.85em', color: '#999' }}>
+                {isEnabled ? 'ON' : 'OFF'}
+              </span>
+              <div
+                onClick={toggleWakeLock}
+                style={{
+                  width: '44px',
+                  height: '24px',
+                  backgroundColor: isEnabled ? '#8bc34a' : '#555',
+                  borderRadius: '12px',
+                  position: 'relative',
+                  transition: 'background-color 0.2s',
+                  cursor: 'pointer'
+                }}
+              >
+                <div style={{
+                  width: '20px',
+                  height: '20px',
+                  backgroundColor: '#fff',
+                  borderRadius: '50%',
+                  position: 'absolute',
+                  top: '2px',
+                  left: isEnabled ? '22px' : '2px',
+                  transition: 'left 0.2s'
+                }} />
+              </div>
+            </label>
+          </div>
+        )}
+
         {showSheetSelector || !sheetId ? (
           <SheetSelector />
         ) : isGapiLoaded ? (

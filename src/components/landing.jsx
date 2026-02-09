@@ -103,7 +103,7 @@ const Landing = ({ onGetStarted, isLoggedIn }) => {
           paddingLeft: '1.5em'
         }}>
           <li>Create your workout plan in Google Sheets</li>
-          <li>Sign in with your Google account</li>
+          <li>View public sheets instantly, or sign in to access private sheets</li>
           <li>Connect your workout spreadsheet</li>
           <li>View and track your workouts with a beautiful interface</li>
         </ol>

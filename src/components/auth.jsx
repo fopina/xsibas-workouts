@@ -1,18 +1,24 @@
 import { useState, useEffect } from 'preact/hooks';
 
 const STORAGE_KEY = 'google_access_token';
+const USER_NAME_KEY = 'google_user_name';
 
 const Auth = ({ onAuthChange }) => {
   const [tokenClient, setTokenClient] = useState(null);
   const [accessToken, setAccessToken] = useState(null);
+  const [userName, setUserName] = useState(null);
 
-  // Restore token from localStorage on mount
+  // Restore token and user name from localStorage on mount
   useEffect(() => {
     const storedToken = localStorage.getItem(STORAGE_KEY);
+    const storedUserName = localStorage.getItem(USER_NAME_KEY);
     if (storedToken) {
       console.log('Restored token from localStorage');
       setAccessToken(storedToken);
       onAuthChange(storedToken);
+      if (storedUserName) {
+        setUserName(storedUserName);
+      }
     }
   }, [onAuthChange]);
 
@@ -23,13 +29,29 @@ const Auth = ({ onAuthChange }) => {
         console.log('Client ID:', import.meta.env.VITE_GOOGLE_CLIENT_ID);
         const client = window.google.accounts.oauth2.initTokenClient({
           client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-          scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file',
-          callback: (tokenResponse) => {
+          scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile',
+          callback: async (tokenResponse) => {
             console.log('Token response received:', tokenResponse);
             if (tokenResponse && tokenResponse.access_token) {
               setAccessToken(tokenResponse.access_token);
               localStorage.setItem(STORAGE_KEY, tokenResponse.access_token);
               onAuthChange(tokenResponse.access_token);
+
+              // Fetch user info to get the name
+              try {
+                const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+                  headers: {
+                    Authorization: `Bearer ${tokenResponse.access_token}`
+                  }
+                });
+                const userInfo = await userInfoResponse.json();
+                if (userInfo.name) {
+                  setUserName(userInfo.name);
+                  localStorage.setItem(USER_NAME_KEY, userInfo.name);
+                }
+              } catch (err) {
+                console.error('Error fetching user info:', err);
+              }
             }
           },
         });
@@ -67,21 +89,35 @@ const Auth = ({ onAuthChange }) => {
     if (accessToken) {
       window.google.accounts.oauth2.revoke(accessToken, () => {
         setAccessToken(null);
+        setUserName(null);
         localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(USER_NAME_KEY);
         onAuthChange(null);
       });
     }
   };
 
   return (
-    <div>
-      {!accessToken && (
-        <button onClick={handleLogin}>Log In with Google</button>
-      )}
-      {accessToken && (
-        <button onClick={handleLogout} style={{ fontSize: '0.85em', padding: '0.4em 0.8em' }}>
-          Log Out
-        </button>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      {!accessToken ? (
+        <>
+          <span style={{ fontSize: '0.85em', color: '#888' }}>
+            Viewing anonymously
+          </span>
+          <button onClick={handleLogin}>Log In</button>
+        </>
+      ) : (
+        <>
+          <span style={{ fontSize: '0.85em', color: '#8bc34a' }}>
+            {userName || 'Logged in'}
+          </span>
+          <button
+            onClick={handleLogout}
+            style={{ fontSize: '0.85em', padding: '0.4em 0.8em' }}
+          >
+            Log Out
+          </button>
+        </>
       )}
     </div>
   );

@@ -4,25 +4,47 @@ A web application that displays workout plans from a Google Sheet with an intuit
 
 ## Features
 
-- Google OAuth authentication with persistent login
+- **Anonymous access** to public Google Sheets (no login required)
+- **Optional authentication** for private sheets and editing
 - Week and month calendar views
 - Color-coded days (green for workout days, gray for rest days)
+- Editable workout notes (requires authentication)
 - Responsive design for mobile and desktop
 - Sheet selection via URL or direct input
 
 ## Environment Variables
 
-To run this project, you will need to create a `.env` file in the root of the project and add the following environment variable:
+To run this project, you will need to create a `.env` file in the root of the project and add the following environment variables:
 
-*   `VITE_GOOGLE_CLIENT_ID`: Your Google Cloud project's OAuth 2.0 Client ID.
+*   `VITE_GOOGLE_CLIENT_ID`: Your Google Cloud project's OAuth 2.0 Client ID (required for authenticated access to private sheets and editing)
+*   `VITE_GOOGLE_API_KEY`: Your Google Cloud project's API Key (required for anonymous access to public sheets)
 
-## Google OAuth Scope
+### Setting up the API Key
 
-This application uses the `https://www.googleapis.com/auth/spreadsheets` scope, which is a **restricted scope** requiring Google verification.
+**IMPORTANT:** The API key should be restricted to prevent unauthorized usage:
 
-**Why spreadsheets instead of drive.file:**
+1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+2. Create or select your API key
+3. Under "API restrictions", select "Restrict key"
+4. Enable only: **Google Sheets API**
+5. Optionally add application restrictions (HTTP referrers) to limit usage to your domain
 
-While `drive.file` is a non-sensitive scope with simpler verification, it does **not grant access to the Google Sheets API** for files selected via the picker or provided by direct link. The `drive.file` scope only allows reading file metadata, not the actual spreadsheet content through the Sheets API.
+This ensures the API key can only be used to access the Sheets API and cannot be misused for other Google services.
+
+## Authentication Modes
+
+### Anonymous Access (Public Sheets)
+Users can view **public Google Sheets** without logging in. The application uses an API key to access publicly shared sheets in read-only mode. No authentication is required, providing instant access to workout plans.
+
+### Authenticated Access (Private Sheets & Editing)
+For private sheets or to edit workout notes, users must authenticate with their Google account.
+
+**OAuth Scopes Used:**
+- `https://www.googleapis.com/auth/spreadsheets` - Full access to read and write spreadsheet data
+- `https://www.googleapis.com/auth/drive.file` - Access to files selected via Google Picker
+- `https://www.googleapis.com/auth/userinfo.profile` - Display user's name when logged in
+
+**Why spreadsheets instead of spreadsheets.readonly:**
 
 The full `spreadsheets` scope (not just readonly) is required because the app allows users to update workout notes directly in their spreadsheets.
 
@@ -30,7 +52,7 @@ The full `spreadsheets` scope (not just readonly) is required because the app al
 
 The application **only accesses spreadsheets that users explicitly provide** either by:
 - Direct sheet URL/ID input
-- Selection through the Google Picker interface
+- Selection through the Google Picker interface (authenticated users only)
 
 The code can be reviewed to verify that it only opens specific files provided by the user and does not access any other spreadsheets in the user's Google Drive.
 
@@ -50,7 +72,7 @@ The code can be reviewed to verify that it only opens specific files provided by
     npm run dev:lan
     ```
 
-3. Open the application in your browser and log in with Google.
+3. Open the application in your browser.
 
 4. Enter your Google Sheet ID or paste the full Google Sheets URL:
    - Full URL example: `https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit`
@@ -60,6 +82,11 @@ The code can be reviewed to verify that it only opens specific files provided by
    ```
    http://localhost:5173/?sheet=YOUR_SHEET_ID
    ```
+
+5. **When to log in:**
+   - If your sheet is **public**, you can view it immediately without logging in
+   - If your sheet is **private**, you'll be prompted to log in
+   - To **edit workout notes**, you must be logged in (even on public sheets)
 
 ## Sheet Format
 

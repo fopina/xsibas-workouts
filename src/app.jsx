@@ -496,17 +496,17 @@ export function App() {
       <main>
         {showSheetSelector || !sheetId ? (
           <SheetSelector />
-        ) : accessToken && isGapiLoaded ? (
+        ) : isGapiLoaded ? (
           <WorkoutLog
             accessToken={accessToken}
             sheetId={sheetId}
             onSheetTitleLoaded={updateSheetTitle}
+            onAuthRequired={() => {
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
           />
         ) : (
-          <p>Please log in with Google to view your workout plan.</p>
-        )}
-        {accessToken && !isGapiLoaded && (
-            <p>Loading Google API client...</p>
+          <p>Loading Google API client...</p>
         )}
       </main>
       <footer style={{

@@ -4,7 +4,7 @@ import { validateSpreadsheetSchema, formatValidationErrors } from '../utils/sche
 // We access gapi via the window object, as it's loaded from a script tag.
 const gapi = window.gapi;
 
-const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded }) => {
+const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired }) => {
   const [workouts, setWorkouts] = useState([]);
   const [exerciseVideoMap, setExerciseVideoMap] = useState({});
   const [expandedVideos, setExpandedVideos] = useState({});
@@ -111,7 +111,11 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded }) => {
   };
 
   useEffect(() => {
-    if (!accessToken) {
+    const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
+
+    // Need either OAuth token or API key to proceed
+    if (!accessToken && (!apiKey || apiKey === 'YOUR_API_KEY_HERE')) {
+      setError('Please log in to view your workout plan.');
       return;
     }
 
@@ -129,8 +133,12 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded }) => {
           }, 100);
         });
 
-        // 1. Set the access token
-        gapi.client.setToken({ access_token: accessToken });
+        // 1. Configure authentication - use OAuth token if available, otherwise API key
+        if (accessToken) {
+          gapi.client.setToken({ access_token: accessToken });
+        } else if (apiKey) {
+          gapi.client.setApiKey(apiKey);
+        }
 
         // 2. Load the Sheets API discovery document
         try {
@@ -228,11 +236,23 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded }) => {
         console.error("Error fetching sheet data:", err);
         const errorMessage = err.result?.error?.message || err.message || '';
         const errorStatus = err.result?.error?.status || err.status || '';
+        const errorCode = err.result?.error?.code || err.code || 0;
 
-        // Check for authentication errors
-        if (errorStatus === 'UNAUTHENTICATED' || errorMessage.includes('Invalid Credentials') || errorMessage.includes('invalid authentication')) {
+        // Check for permission errors when in anonymous mode
+        if ((errorStatus === 'PERMISSION_DENIED' || errorCode === 403) && !accessToken) {
+          setError('This sheet is private. Please log in to view it.');
+          if (onAuthRequired) onAuthRequired();
+        }
+        // Check for authentication errors with token
+        else if (errorStatus === 'UNAUTHENTICATED' || errorMessage.includes('Invalid Credentials') || errorMessage.includes('invalid authentication')) {
           setError('Login expired. Login again');
-        } else {
+          if (onAuthRequired) onAuthRequired();
+        }
+        // Check for permission errors when authenticated
+        else if ((errorStatus === 'PERMISSION_DENIED' || errorCode === 403) && accessToken) {
+          setError(`You don't have permission to access this sheet. Make sure it's shared with your Google account.`);
+        }
+        else {
           setError(`Error fetching workout data: ${errorMessage}`);
         }
       } finally {
@@ -304,6 +324,12 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded }) => {
 
   // Function to update notes in the spreadsheet
   const updateNotes = async (rowIndex, newNotes, exerciseKey) => {
+    if (!accessToken) {
+      alert('Please sign in to edit notes');
+      if (onAuthRequired) onAuthRequired();
+      return;
+    }
+
     setSavingNotes(prev => ({ ...prev, [exerciseKey]: true }));
 
     try {
@@ -557,10 +583,11 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded }) => {
                                   );
                                 }
 
-                                // Special handling for Notes field - make it editable
+                                // Special handling for Notes field - make it editable (only when authenticated)
                                 if (key === 'Notes') {
                                   const isEditing = exerciseKey in editingNotes;
                                   const isSaving = exerciseKey in savingNotes;
+                                  const canEdit = !!accessToken; // Only allow editing when authenticated
 
                                   return (
                                     <div key={key} style={{ marginTop: '10px', marginBottom: '5px' }}>
@@ -637,24 +664,44 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded }) => {
                                           }}>
                                             {value || 'No notes yet'}
                                           </div>
-                                          <button
-                                            onClick={() => setEditingNotes(prev => ({
-                                              ...prev,
-                                              [exerciseKey]: value || ''
-                                            }))}
-                                            style={{
-                                              marginTop: '5px',
-                                              padding: '4px 8px',
-                                              fontSize: '0.8em',
-                                              backgroundColor: '#333',
-                                              color: '#aaa',
-                                              border: '1px solid #444',
-                                              borderRadius: '3px',
-                                              cursor: 'pointer'
-                                            }}
-                                          >
-                                            {value ? 'Edit Notes' : 'Add Notes'}
-                                          </button>
+                                          {canEdit ? (
+                                            <button
+                                              onClick={() => setEditingNotes(prev => ({
+                                                ...prev,
+                                                [exerciseKey]: value || ''
+                                              }))}
+                                              style={{
+                                                marginTop: '5px',
+                                                padding: '4px 8px',
+                                                fontSize: '0.8em',
+                                                backgroundColor: '#333',
+                                                color: '#aaa',
+                                                border: '1px solid #444',
+                                                borderRadius: '3px',
+                                                cursor: 'pointer'
+                                              }}
+                                            >
+                                              {value ? 'Edit Notes' : 'Add Notes'}
+                                            </button>
+                                          ) : (
+                                            <button
+                                              onClick={() => {
+                                                if (onAuthRequired) onAuthRequired();
+                                              }}
+                                              style={{
+                                                marginTop: '5px',
+                                                padding: '4px 8px',
+                                                fontSize: '0.8em',
+                                                backgroundColor: '#646cff',
+                                                color: '#fff',
+                                                border: 'none',
+                                                borderRadius: '3px',
+                                                cursor: 'pointer'
+                                              }}
+                                            >
+                                              Sign in to {value ? 'edit' : 'add'} notes
+                                            </button>
+                                          )}
                                         </div>
                                       )}
                                     </div>

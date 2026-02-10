@@ -536,7 +536,7 @@ export function App() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5em', flex: 1 }}>
               <span style={{ fontSize: '1.2em' }}>📱</span>
               <span style={{ color: '#d4f4d4' }}>
-                Install app to home screen for best experience
+                Add to Home Screen for the best experience
               </span>
             </div>
             <button

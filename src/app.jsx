@@ -488,41 +488,6 @@ export function App() {
   // Show main app for /workout path
   return (
     <div class="app-container">
-      {/* Install to home screen banner */}
-      {showInstallBanner && (
-        <div style={{
-          backgroundColor: '#2a5a2a',
-          borderBottom: '1px solid #4a7c4a',
-          padding: '0.75em 1em',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: '1em',
-          fontSize: '0.85em'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5em', flex: 1 }}>
-            <span style={{ fontSize: '1.2em' }}>📱</span>
-            <span style={{ color: '#fff' }}>
-              Install this app on your home screen for the best experience
-            </span>
-          </div>
-          <button
-            onClick={dismissInstallBanner}
-            style={{
-              backgroundColor: 'transparent',
-              border: 'none',
-              color: '#8bc34a',
-              cursor: 'pointer',
-              fontSize: '1.2em',
-              padding: '0.2em 0.5em',
-              lineHeight: 1
-            }}
-            aria-label="Dismiss"
-          >
-            ✕
-          </button>
-        </div>
-      )}
       <header>
         <img
           src="/xsibas300.png"
@@ -554,6 +519,46 @@ export function App() {
         </div>
       </header>
       <main>
+        {/* Install to home screen banner */}
+        {showInstallBanner && (
+          <div style={{
+            backgroundColor: '#2a4a2a',
+            border: '1px solid #4a7c4a',
+            borderRadius: '4px',
+            padding: '0.75em',
+            marginBottom: '1em',
+            fontSize: '0.9em',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '1em'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5em', flex: 1 }}>
+              <span style={{ fontSize: '1.2em' }}>📱</span>
+              <span style={{ color: '#d4f4d4' }}>
+                Install app to home screen for best experience
+              </span>
+            </div>
+            <button
+              onClick={dismissInstallBanner}
+              style={{
+                backgroundColor: 'transparent',
+                border: 'none',
+                color: '#8bc34a',
+                cursor: 'pointer',
+                fontSize: '1.4em',
+                padding: '0',
+                lineHeight: 1,
+                minWidth: '24px',
+                minHeight: '24px'
+              }}
+              aria-label="Dismiss"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         {/* Wake Lock control banner - always visible */}
         {!isSupported ? (
           <div style={{

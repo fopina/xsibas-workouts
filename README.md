@@ -103,11 +103,32 @@ The code can be reviewed to verify that it only opens specific files provided by
 
 The application expects a Google Sheet with a tab named "WorkoutLog" containing workout data with columns including at least a "Date" column in YYYY-MM-DD format.
 
+## Testing
+
+This project includes comprehensive unit and integration tests. See [TESTING.md](TESTING.md) for detailed testing documentation.
+
+### Quick Start
+
+```bash
+# Run unit tests
+npm run test:unit
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with coverage
+npm run test:coverage
+
+# Run integration tests (requires service account setup)
+npm run test:integration
+```
+
 ## Technologies Used
 
 *   [Vite](https://vitejs.dev/)
 *   [Preact](https://preactjs.com/)
 *   [Google API](https://developers.google.com/gsuite/guides/overview)
+*   [Vitest](https://vitest.dev/) - Testing framework
 
 ## Project Structure
 

@@ -16,6 +16,7 @@ export function App() {
   const [inputValue, setInputValue] = useState('');
   const [showSheetSelector, setShowSheetSelector] = useState(false);
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
 
   // Simple router: listen to popstate and update current path
   useEffect(() => {
@@ -30,6 +31,24 @@ export function App() {
   const navigate = (path) => {
     window.history.pushState({}, '', path);
     setCurrentPath(path);
+  };
+
+  // Detect if running as standalone PWA
+  useEffect(() => {
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                         window.navigator.standalone ||
+                         document.referrer.includes('android-app://');
+
+    const hasBeenDismissed = localStorage.getItem('installBannerDismissed') === 'true';
+
+    if (!isStandalone && !hasBeenDismissed) {
+      setShowInstallBanner(true);
+    }
+  }, []);
+
+  const dismissInstallBanner = () => {
+    setShowInstallBanner(false);
+    localStorage.setItem('installBannerDismissed', 'true');
   };
 
   // Prevent screen sleep throughout the app
@@ -500,6 +519,46 @@ export function App() {
         </div>
       </header>
       <main>
+        {/* Install to home screen banner */}
+        {showInstallBanner && (
+          <div style={{
+            backgroundColor: '#2a4a2a',
+            border: '1px solid #4a7c4a',
+            borderRadius: '4px',
+            padding: '0.75em',
+            marginBottom: '1em',
+            fontSize: '0.9em',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '1em'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5em', flex: 1 }}>
+              <span style={{ fontSize: '1.2em' }}>📱</span>
+              <span style={{ color: '#d4f4d4' }}>
+                Add to Home Screen for the best experience
+              </span>
+            </div>
+            <button
+              onClick={dismissInstallBanner}
+              style={{
+                backgroundColor: 'transparent',
+                border: 'none',
+                color: '#8bc34a',
+                cursor: 'pointer',
+                fontSize: '1.4em',
+                padding: '0',
+                lineHeight: 1,
+                minWidth: '24px',
+                minHeight: '24px'
+              }}
+              aria-label="Dismiss"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         {/* Wake Lock control banner - always visible */}
         {!isSupported ? (
           <div style={{

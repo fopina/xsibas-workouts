@@ -510,6 +510,10 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired }
                           const videoId = getYouTubeVideoId(videoLink);
                           const exerciseKey = `${sectionName}-${exerciseIndex}`;
                           const showVideo = expandedVideos[exerciseKey];
+                          const notesValue = exercise.Notes || '';
+                          const isEditingNotes = exerciseKey in editingNotes;
+                          const isSavingNotes = exerciseKey in savingNotes;
+                          const canEditNotes = !!accessToken;
 
                           // Find the row index in the original workouts array for this exercise
                           const rowIndex = workouts.findIndex(w =>
@@ -532,39 +536,93 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired }
                                 if (key === 'Date' || key === 'Section' || key === 'Section Prescription' || key === 'Day') return null;
                                 if (!value && key !== 'Notes') return null;
 
-                                // Special handling for Exercise field - show with video toggle if available
-                                if (key === 'Exercise' && videoLink) {
+                                // Special handling for Exercise field - larger text, optional video actions
+                                if (key === 'Exercise') {
                                   return (
                                     <div key={key}>
-                                      <div style={{ marginBottom: '3px' }}>
-                                        <strong>{key}:</strong>{' '}
-                                        <a
-                                          href={videoLink}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          style={{ color: '#646cff', textDecoration: 'none' }}
-                                          onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
-                                          onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
-                                        >
-                                          {value}
-                                        </a>
-                                        {videoId && (
-                                          <button
-                                            onClick={() => toggleVideo(exerciseKey)}
-                                            style={{
-                                              marginLeft: '10px',
-                                              padding: '2px 8px',
-                                              fontSize: '0.85em',
-                                              backgroundColor: '#333',
-                                              color: '#aaa',
-                                              border: '1px solid #444',
-                                              borderRadius: '3px',
-                                              cursor: 'pointer'
-                                            }}
-                                          >
-                                            {showVideo ? '▲ Hide Video' : '▼ Show Video'}
-                                          </button>
-                                        )}
+                                      <div style={{
+                                        marginBottom: '6px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        gap: '10px'
+                                      }}>
+                                        <div style={{ fontSize: '1.05em', fontWeight: 600, minWidth: 0, flex: 1 }}>
+                                          {videoLink ? (
+                                            <a
+                                              href={videoLink}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              style={{ color: '#646cff', textDecoration: 'none' }}
+                                              onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
+                                              onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
+                                            >
+                                              {value}
+                                            </a>
+                                          ) : (
+                                            <span>{value}</span>
+                                          )}
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
+                                          {videoId && (
+                                            <button
+                                              onClick={() => toggleVideo(exerciseKey)}
+                                              title={showVideo ? 'Hide video' : 'Show video'}
+                                              aria-label={showVideo ? 'Hide video' : 'Show video'}
+                                              style={{
+                                                padding: '2px 8px',
+                                                fontSize: '0.85em',
+                                                backgroundColor: '#333',
+                                                color: '#aaa',
+                                                border: '1px solid #444',
+                                                borderRadius: '3px',
+                                                cursor: 'pointer'
+                                              }}
+                                            >
+                                              📹
+                                            </button>
+                                          )}
+                                          {canEditNotes ? (
+                                            <button
+                                              onClick={() => setEditingNotes(prev => ({
+                                                ...prev,
+                                                [exerciseKey]: notesValue
+                                              }))}
+                                              title={notesValue ? 'Edit notes' : 'Add notes'}
+                                              aria-label={notesValue ? 'Edit notes' : 'Add notes'}
+                                              style={{
+                                                padding: '2px 8px',
+                                                fontSize: '0.85em',
+                                                backgroundColor: '#333',
+                                                color: '#aaa',
+                                                border: '1px solid #444',
+                                                borderRadius: '3px',
+                                                cursor: 'pointer'
+                                              }}
+                                            >
+                                              📝
+                                            </button>
+                                          ) : (
+                                            <button
+                                              onClick={() => {
+                                                if (onAuthRequired) onAuthRequired();
+                                              }}
+                                              title={`Sign in to ${notesValue ? 'edit' : 'add'} notes`}
+                                              aria-label={`Sign in to ${notesValue ? 'edit' : 'add'} notes`}
+                                              style={{
+                                                padding: '2px 8px',
+                                                fontSize: '0.85em',
+                                                backgroundColor: '#646cff',
+                                                color: '#fff',
+                                                border: 'none',
+                                                borderRadius: '3px',
+                                                cursor: 'pointer'
+                                              }}
+                                            >
+                                              📝
+                                            </button>
+                                          )}
+                                        </div>
                                       </div>
                                       {showVideo && videoId && (
                                         <div style={{ marginTop: '10px', marginBottom: '10px' }}>
@@ -585,14 +643,9 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired }
 
                                 // Special handling for Notes field - make it editable (only when authenticated)
                                 if (key === 'Notes') {
-                                  const isEditing = exerciseKey in editingNotes;
-                                  const isSaving = exerciseKey in savingNotes;
-                                  const canEdit = !!accessToken; // Only allow editing when authenticated
-
                                   return (
                                     <div key={key} style={{ marginTop: '10px', marginBottom: '5px' }}>
-                                      <strong>Notes:</strong>
-                                      {isEditing ? (
+                                      {isEditingNotes ? (
                                         <div style={{ marginTop: '5px' }}>
                                           <textarea
                                             value={editingNotes[exerciseKey] || ''}
@@ -617,7 +670,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired }
                                           <div style={{ marginTop: '5px', display: 'flex', gap: '5px' }}>
                                             <button
                                               onClick={() => updateNotes(rowIndex, editingNotes[exerciseKey] || '', exerciseKey)}
-                                              disabled={isSaving}
+                                              disabled={isSavingNotes}
                                               style={{
                                                 padding: '5px 10px',
                                                 fontSize: '0.85em',
@@ -625,11 +678,11 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired }
                                                 color: '#fff',
                                                 border: 'none',
                                                 borderRadius: '4px',
-                                                cursor: isSaving ? 'not-allowed' : 'pointer',
-                                                opacity: isSaving ? 0.6 : 1
+                                                cursor: isSavingNotes ? 'not-allowed' : 'pointer',
+                                                opacity: isSavingNotes ? 0.6 : 1
                                               }}
                                             >
-                                              {isSaving ? 'Saving...' : 'Save'}
+                                              {isSavingNotes ? 'Saving...' : 'Save'}
                                             </button>
                                             <button
                                               onClick={() => setEditingNotes(prev => {
@@ -637,7 +690,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired }
                                                 delete updated[exerciseKey];
                                                 return updated;
                                               })}
-                                              disabled={isSaving}
+                                              disabled={isSavingNotes}
                                               style={{
                                                 padding: '5px 10px',
                                                 fontSize: '0.85em',
@@ -645,7 +698,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired }
                                                 color: '#aaa',
                                                 border: '1px solid #444',
                                                 borderRadius: '4px',
-                                                cursor: isSaving ? 'not-allowed' : 'pointer'
+                                                cursor: isSavingNotes ? 'not-allowed' : 'pointer'
                                               }}
                                             >
                                               Cancel
@@ -654,53 +707,14 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired }
                                         </div>
                                       ) : (
                                         <div style={{ marginTop: '5px' }}>
-                                          <div style={{
-                                            padding: '8px',
-                                            backgroundColor: '#2a2a2a',
-                                            borderRadius: '4px',
-                                            minHeight: '30px',
-                                            color: value ? '#fff' : '#666',
-                                            fontStyle: value ? 'normal' : 'italic'
-                                          }}>
-                                            {value || 'No notes yet'}
-                                          </div>
-                                          {canEdit ? (
-                                            <button
-                                              onClick={() => setEditingNotes(prev => ({
-                                                ...prev,
-                                                [exerciseKey]: value || ''
-                                              }))}
-                                              style={{
-                                                marginTop: '5px',
-                                                padding: '4px 8px',
-                                                fontSize: '0.8em',
-                                                backgroundColor: '#333',
-                                                color: '#aaa',
-                                                border: '1px solid #444',
-                                                borderRadius: '3px',
-                                                cursor: 'pointer'
-                                              }}
-                                            >
-                                              {value ? 'Edit Notes' : 'Add Notes'}
-                                            </button>
-                                          ) : (
-                                            <button
-                                              onClick={() => {
-                                                if (onAuthRequired) onAuthRequired();
-                                              }}
-                                              style={{
-                                                marginTop: '5px',
-                                                padding: '4px 8px',
-                                                fontSize: '0.8em',
-                                                backgroundColor: '#646cff',
-                                                color: '#fff',
-                                                border: 'none',
-                                                borderRadius: '3px',
-                                                cursor: 'pointer'
-                                              }}
-                                            >
-                                              Sign in to {value ? 'edit' : 'add'} notes
-                                            </button>
+                                          {value && (
+                                            <div style={{
+                                              color: '#aaa',
+                                              fontStyle: 'italic',
+                                              marginBottom: '4px'
+                                            }}>
+                                              {value}
+                                            </div>
                                           )}
                                         </div>
                                       )}
@@ -710,7 +724,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired }
 
                                 return (
                                   <div key={key} style={{ marginBottom: '3px' }}>
-                                    <strong>{key}:</strong> {value}
+                                    {value}
                                   </div>
                                 );
                               })}

@@ -123,6 +123,17 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired }
     );
   };
 
+  const shouldRetryAnonymously = (err) => {
+    const errorStatus = err?.result?.error?.status || err?.status || '';
+    const errorCode = err?.result?.error?.code || err?.code || 0;
+
+    return (
+      isTokenAuthError(err) ||
+      errorStatus === 'PERMISSION_DENIED' ||
+      errorCode === 403
+    );
+  };
+
   useEffect(() => {
     const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
     const hasApiKey = !!apiKey && apiKey !== 'YOUR_API_KEY_HERE';
@@ -169,6 +180,8 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired }
             gapi.client.setToken({ access_token: accessToken });
           } else {
             gapi.client.setToken(null);
+            // Some gapi versions can keep stale auth in memory; clear token aggressively.
+            gapi.client.setToken({});
             if (hasApiKey) {
               gapi.client.setApiKey(apiKey);
             }
@@ -258,7 +271,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired }
         } catch (err) {
           // Invalid/expired token should not block access to public sheets:
           // retry once anonymously when API key is available.
-          if (currentAuthMode === 'token' && hasApiKey && isTokenAuthError(err)) {
+          if (currentAuthMode === 'token' && hasApiKey && shouldRetryAnonymously(err)) {
             currentAuthMode = 'anonymous';
             await fetchWithCurrentAuthMode();
           } else {

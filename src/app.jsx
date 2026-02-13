@@ -11,6 +11,7 @@ const SHEETS_HISTORY_KEY = 'workout_sheets_history';
 
 export function App() {
   const [accessToken, setAccessToken] = useState(null);
+  const [forceLogoutVersion, setForceLogoutVersion] = useState(0);
   const [isGapiLoaded, setIsGapiLoaded] = useState(false);
   const [sheetId, setSheetId] = useState('');
   const [inputValue, setInputValue] = useState('');
@@ -515,7 +516,7 @@ export function App() {
               Sheet
             </button>
           )}
-          <Auth onAuthChange={handleAuthChange} />
+          <Auth onAuthChange={handleAuthChange} forceLogoutVersion={forceLogoutVersion} />
         </div>
       </header>
       <main>
@@ -640,6 +641,10 @@ export function App() {
             accessToken={accessToken}
             sheetId={sheetId}
             onSheetTitleLoaded={updateSheetTitle}
+            onSessionExpired={() => {
+              setAccessToken(null);
+              setForceLogoutVersion(v => v + 1);
+            }}
             onAuthRequired={() => {
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}

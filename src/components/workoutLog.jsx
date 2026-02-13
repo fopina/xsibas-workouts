@@ -4,7 +4,7 @@ import { validateSpreadsheetSchema, formatValidationErrors } from '../utils/sche
 // We access gapi via the window object, as it's loaded from a script tag.
 const gapi = window.gapi;
 
-const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired }) => {
+const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, onSessionExpired }) => {
   const [workouts, setWorkouts] = useState([]);
   const [exerciseVideoMap, setExerciseVideoMap] = useState({});
   const [expandedVideos, setExpandedVideos] = useState({});
@@ -246,6 +246,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired }
         // Check for authentication errors with token
         else if (errorStatus === 'UNAUTHENTICATED' || errorMessage.includes('Invalid Credentials') || errorMessage.includes('invalid authentication')) {
           setError('Login expired. Login again');
+          if (onSessionExpired) onSessionExpired();
           if (onAuthRequired) onAuthRequired();
         }
         // Check for permission errors when authenticated

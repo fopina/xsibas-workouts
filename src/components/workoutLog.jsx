@@ -110,11 +110,25 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired }
     return null;
   };
 
+  const isTokenAuthError = (err) => {
+    const errorMessage = (err?.result?.error?.message || err?.message || '').toLowerCase();
+    const errorStatus = err?.result?.error?.status || err?.status || '';
+    const errorCode = err?.result?.error?.code || err?.code || 0;
+
+    return (
+      errorStatus === 'UNAUTHENTICATED' ||
+      errorCode === 401 ||
+      errorMessage.includes('invalid credentials') ||
+      errorMessage.includes('invalid authentication')
+    );
+  };
+
   useEffect(() => {
     const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
+    const hasApiKey = !!apiKey && apiKey !== 'YOUR_API_KEY_HERE';
 
     // Need either OAuth token or API key to proceed
-    if (!accessToken && (!apiKey || apiKey === 'YOUR_API_KEY_HERE')) {
+    if (!accessToken && !hasApiKey) {
       setError('Please log in to view your workout plan.');
       return;
     }
@@ -122,6 +136,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired }
     const fetchSheetData = async () => {
       setLoading(true);
       setError(null);
+      let currentAuthMode = accessToken ? 'token' : 'anonymous';
       try {
         // Wait for gapi.client to be initialized
         await new Promise((resolve) => {
@@ -132,13 +147,6 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired }
             }
           }, 100);
         });
-
-        // 1. Configure authentication - use OAuth token if available, otherwise API key
-        if (accessToken) {
-          gapi.client.setToken({ access_token: accessToken });
-        } else if (apiKey) {
-          gapi.client.setApiKey(apiKey);
-        }
 
         // 2. Load the Sheets API discovery document
         try {
@@ -155,82 +163,107 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired }
           return;
         }
 
-        // 2.5. Validate spreadsheet schema
-        try {
-          const validation = await validateSpreadsheetSchema(gapi, sheetId);
-          if (!validation.valid) {
-            setError(formatValidationErrors(validation.errors));
-            setLoading(false);
-            return;
-          }
-        } catch (err) {
-          // Let auth/permission errors from validation bubble up to main error handler
-          throw err;
-        }
-
-        // 3. Fetch spreadsheet metadata to get title
-        try {
-          const metadataResponse = await gapi.client.sheets.spreadsheets.get({
-            spreadsheetId: sheetId,
-            fields: 'properties.title'
-          });
-          const sheetTitle = metadataResponse.result.properties?.title;
-          if (sheetTitle && onSheetTitleLoaded) {
-            onSheetTitleLoaded(sheetId, sheetTitle);
-          }
-        } catch (err) {
-          console.warn('Could not fetch sheet title:', err);
-        }
-
-        // 5. Fetch Exercises tab to get video link mapping
-        const exercisesResponse = await gapi.client.sheets.spreadsheets.values.get({
-          spreadsheetId: sheetId,
-          range: 'Exercises!A:D',
-        });
-
-        const exercisesData = exercisesResponse.result.values;
-        const videoMap = {};
-        if (exercisesData && exercisesData.length > 1) {
-          // Assuming row 0 is headers, find the Exercise and VideoLink columns
-          const exerciseHeaders = exercisesData[0];
-          const exerciseNameIndex = exerciseHeaders.indexOf('Exercise');
-          const videoLinkIndex = exerciseHeaders.indexOf('VideoLink');
-
-          if (exerciseNameIndex !== -1 && videoLinkIndex !== -1) {
-            exercisesData.slice(1).forEach(row => {
-              const exerciseName = row[exerciseNameIndex];
-              const videoLink = row[videoLinkIndex];
-              if (exerciseName && videoLink) {
-                videoMap[exerciseName] = videoLink;
-              }
-            });
-          }
-        }
-        setExerciseVideoMap(videoMap);
-
-        // 6. Fetch WorkoutLog data
-        const workoutResponse = await gapi.client.sheets.spreadsheets.values.get({
-          spreadsheetId: sheetId,
-          range: 'WorkoutLog!A:Z',
-        });
-
-        const data = workoutResponse.result.values;
-        if (data && data.length > 0) {
-          const headers = data[0];
-          const formattedData = data.slice(1).map(row => {
-            const workout = {};
-            headers.forEach((header, index) => {
-              workout[header] = row[index] || ''; // Ensure empty cells are handled
-            });
-            // Ensure every workout has a Notes field even if column doesn't exist
-            if (!('Notes' in workout)) {
-              workout.Notes = '';
+        const fetchWithCurrentAuthMode = async () => {
+          // Configure authentication mode for this attempt
+          if (currentAuthMode === 'token') {
+            gapi.client.setToken({ access_token: accessToken });
+          } else {
+            gapi.client.setToken(null);
+            if (hasApiKey) {
+              gapi.client.setApiKey(apiKey);
             }
-            return workout;
+          }
+
+          // 2.5. Validate spreadsheet schema
+          try {
+            const validation = await validateSpreadsheetSchema(gapi, sheetId);
+            if (!validation.valid) {
+              setError(formatValidationErrors(validation.errors));
+              setLoading(false);
+              return;
+            }
+          } catch (err) {
+            // Let auth/permission errors from validation bubble up to main error handler
+            throw err;
+          }
+
+          // 3. Fetch spreadsheet metadata to get title
+          try {
+            const metadataResponse = await gapi.client.sheets.spreadsheets.get({
+              spreadsheetId: sheetId,
+              fields: 'properties.title'
+            });
+            const sheetTitle = metadataResponse.result.properties?.title;
+            if (sheetTitle && onSheetTitleLoaded) {
+              onSheetTitleLoaded(sheetId, sheetTitle);
+            }
+          } catch (err) {
+            console.warn('Could not fetch sheet title:', err);
+          }
+
+          // 5. Fetch Exercises tab to get video link mapping
+          const exercisesResponse = await gapi.client.sheets.spreadsheets.values.get({
+            spreadsheetId: sheetId,
+            range: 'Exercises!A:D',
           });
-          setWorkouts(formattedData);
-        } else {
-          setError('No data found in sheet.');
+
+          const exercisesData = exercisesResponse.result.values;
+          const videoMap = {};
+          if (exercisesData && exercisesData.length > 1) {
+            // Assuming row 0 is headers, find the Exercise and VideoLink columns
+            const exerciseHeaders = exercisesData[0];
+            const exerciseNameIndex = exerciseHeaders.indexOf('Exercise');
+            const videoLinkIndex = exerciseHeaders.indexOf('VideoLink');
+
+            if (exerciseNameIndex !== -1 && videoLinkIndex !== -1) {
+              exercisesData.slice(1).forEach(row => {
+                const exerciseName = row[exerciseNameIndex];
+                const videoLink = row[videoLinkIndex];
+                if (exerciseName && videoLink) {
+                  videoMap[exerciseName] = videoLink;
+                }
+              });
+            }
+          }
+          setExerciseVideoMap(videoMap);
+
+          // 6. Fetch WorkoutLog data
+          const workoutResponse = await gapi.client.sheets.spreadsheets.values.get({
+            spreadsheetId: sheetId,
+            range: 'WorkoutLog!A:Z',
+          });
+
+          const data = workoutResponse.result.values;
+          if (data && data.length > 0) {
+            const headers = data[0];
+            const formattedData = data.slice(1).map(row => {
+              const workout = {};
+              headers.forEach((header, index) => {
+                workout[header] = row[index] || ''; // Ensure empty cells are handled
+              });
+              // Ensure every workout has a Notes field even if column doesn't exist
+              if (!('Notes' in workout)) {
+                workout.Notes = '';
+              }
+              return workout;
+            });
+            setWorkouts(formattedData);
+          } else {
+            setError('No data found in sheet.');
+          }
+        };
+
+        try {
+          await fetchWithCurrentAuthMode();
+        } catch (err) {
+          // Invalid/expired token should not block access to public sheets:
+          // retry once anonymously when API key is available.
+          if (currentAuthMode === 'token' && hasApiKey && isTokenAuthError(err)) {
+            currentAuthMode = 'anonymous';
+            await fetchWithCurrentAuthMode();
+          } else {
+            throw err;
+          }
         }
       } catch (err) {
         console.error("Error fetching sheet data:", err);
@@ -239,7 +272,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired }
         const errorCode = err.result?.error?.code || err.code || 0;
 
         // Check for permission errors when in anonymous mode
-        if ((errorStatus === 'PERMISSION_DENIED' || errorCode === 403) && !accessToken) {
+        if ((errorStatus === 'PERMISSION_DENIED' || errorCode === 403) && currentAuthMode === 'anonymous') {
           setError('This sheet is private. Please log in to view it.');
           if (onAuthRequired) onAuthRequired();
         }

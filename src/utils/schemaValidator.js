@@ -15,16 +15,18 @@ const EXPECTED_SCHEMA = {
  * Validates the spreadsheet schema
  * @param {Object} gapi - Google API client
  * @param {string} sheetId - Spreadsheet ID
+ * @param {Object} requestOptions - Extra request params (e.g. { key: apiKey } for anonymous access)
  * @returns {Promise<{valid: boolean, errors: string[]}>}
  */
-export async function validateSpreadsheetSchema(gapi, sheetId) {
+export async function validateSpreadsheetSchema(gapi, sheetId, requestOptions = {}) {
   const errors = [];
 
   // 1. Get spreadsheet metadata to check sheet names
   // This is outside try/catch to let auth/permission errors bubble up
   const metadataResponse = await gapi.client.sheets.spreadsheets.get({
     spreadsheetId: sheetId,
-    fields: 'sheets.properties'
+    fields: 'sheets.properties',
+    ...requestOptions
   });
 
   const sheets = metadataResponse.result.sheets || [];
@@ -47,7 +49,8 @@ export async function validateSpreadsheetSchema(gapi, sheetId) {
     try {
       const headerResponse = await gapi.client.sheets.spreadsheets.values.get({
         spreadsheetId: sheetId,
-        range: `${sheetName}!1:1`
+        range: `${sheetName}!1:1`,
+        ...requestOptions
       });
 
       const actualHeaders = headerResponse.result.values?.[0] || [];

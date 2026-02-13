@@ -134,15 +134,16 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired }
     );
   };
 
-  useEffect(() => {
-    const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
-    const hasApiKey = !!apiKey && apiKey !== 'YOUR_API_KEY_HERE';
+  const formatApiErrorDebug = (err) => {
+    const errorMessage = err?.result?.error?.message || err?.message || 'Unknown error';
+    const errorStatus = err?.result?.error?.status || err?.status || 'UNKNOWN_STATUS';
+    const errorCode = err?.result?.error?.code || err?.code || 'UNKNOWN_CODE';
+    return `[debug status=${errorStatus} code=${errorCode} message="${errorMessage}"]`;
+  };
 
-    // Need either OAuth token or API key to proceed
-    if (!accessToken && !hasApiKey) {
-      setError('Please log in to view your workout plan.');
-      return;
-    }
+  useEffect(() => {
+    const apiKey = (import.meta.env.VITE_GOOGLE_API_KEY || '').trim();
+    const hasApiKey = !!apiKey && apiKey !== 'YOUR_API_KEY_HERE' && apiKey !== 'your_api_key_here';
 
     const fetchSheetData = async () => {
       setLoading(true);
@@ -175,6 +176,8 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired }
         }
 
         const fetchWithCurrentAuthMode = async () => {
+          const requestOptions = currentAuthMode === 'anonymous' && hasApiKey ? { key: apiKey } : {};
+
           // Configure authentication mode for this attempt
           if (currentAuthMode === 'token') {
             gapi.client.setToken({ access_token: accessToken });
@@ -189,7 +192,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired }
 
           // 2.5. Validate spreadsheet schema
           try {
-            const validation = await validateSpreadsheetSchema(gapi, sheetId);
+            const validation = await validateSpreadsheetSchema(gapi, sheetId, requestOptions);
             if (!validation.valid) {
               setError(formatValidationErrors(validation.errors));
               setLoading(false);
@@ -204,7 +207,8 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired }
           try {
             const metadataResponse = await gapi.client.sheets.spreadsheets.get({
               spreadsheetId: sheetId,
-              fields: 'properties.title'
+              fields: 'properties.title',
+              ...requestOptions
             });
             const sheetTitle = metadataResponse.result.properties?.title;
             if (sheetTitle && onSheetTitleLoaded) {
@@ -218,6 +222,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired }
           const exercisesResponse = await gapi.client.sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
             range: 'Exercises!A:D',
+            ...requestOptions
           });
 
           const exercisesData = exercisesResponse.result.values;
@@ -244,6 +249,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired }
           const workoutResponse = await gapi.client.sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
             range: 'WorkoutLog!A:Z',
+            ...requestOptions
           });
 
           const data = workoutResponse.result.values;
@@ -283,23 +289,24 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired }
         const errorMessage = err.result?.error?.message || err.message || '';
         const errorStatus = err.result?.error?.status || err.status || '';
         const errorCode = err.result?.error?.code || err.code || 0;
+        const debugInfo = formatApiErrorDebug(err);
 
         // Check for permission errors when in anonymous mode
         if ((errorStatus === 'PERMISSION_DENIED' || errorCode === 403) && currentAuthMode === 'anonymous') {
-          setError('This sheet is private. Please log in to view it.');
+          setError(`This sheet is private. Please log in to view it. ${debugInfo}`);
           if (onAuthRequired) onAuthRequired();
         }
         // Check for authentication errors with token
         else if (errorStatus === 'UNAUTHENTICATED' || errorMessage.includes('Invalid Credentials') || errorMessage.includes('invalid authentication')) {
-          setError('Login expired. Login again');
+          setError(`Login expired. Login again ${debugInfo}`);
           if (onAuthRequired) onAuthRequired();
         }
         // Check for permission errors when authenticated
         else if ((errorStatus === 'PERMISSION_DENIED' || errorCode === 403) && accessToken) {
-          setError(`You don't have permission to access this sheet. Make sure it's shared with your Google account.`);
+          setError(`You don't have permission to access this sheet. Make sure it's shared with your Google account. ${debugInfo}`);
         }
         else {
-          setError(`Error fetching workout data: ${errorMessage}`);
+          setError(`Error fetching workout data: ${errorMessage} ${debugInfo}`);
         }
       } finally {
         setLoading(false);

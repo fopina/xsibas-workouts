@@ -7,6 +7,7 @@ const gapi = window.gapi;
 const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired }) => {
   const [workouts, setWorkouts] = useState([]);
   const [exerciseVideoMap, setExerciseVideoMap] = useState({});
+  const [exerciseDetailsMap, setExerciseDetailsMap] = useState({});
   const [expandedVideos, setExpandedVideos] = useState({});
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -182,31 +183,43 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired }
           console.warn('Could not fetch sheet title:', err);
         }
 
-        // 5. Fetch Exercises tab to get video link mapping
+        // 5. Fetch Exercises tab to get video and extra metadata per exercise
         const exercisesResponse = await gapi.client.sheets.spreadsheets.values.get({
           spreadsheetId: sheetId,
-          range: 'Exercises!A:D',
+          range: 'Exercises!A:Z',
         });
 
         const exercisesData = exercisesResponse.result.values;
         const videoMap = {};
+        const detailsMap = {};
         if (exercisesData && exercisesData.length > 1) {
-          // Assuming row 0 is headers, find the Exercise and VideoLink columns
+          // Assuming row 0 is headers, find the relevant columns
           const exerciseHeaders = exercisesData[0];
           const exerciseNameIndex = exerciseHeaders.indexOf('Exercise');
           const videoLinkIndex = exerciseHeaders.indexOf('VideoLink');
+          const muscleGroupIndex = exerciseHeaders.indexOf('MuscleGroup');
+          const equimentIndex = exerciseHeaders.indexOf('Equiment');
+          const equipmentIndex = exerciseHeaders.indexOf('Equipment');
+          const resolvedEquipmentIndex = equipmentIndex !== -1 ? equipmentIndex : equimentIndex;
 
-          if (exerciseNameIndex !== -1 && videoLinkIndex !== -1) {
+          if (exerciseNameIndex !== -1) {
             exercisesData.slice(1).forEach(row => {
               const exerciseName = row[exerciseNameIndex];
-              const videoLink = row[videoLinkIndex];
+              const videoLink = videoLinkIndex !== -1 ? (row[videoLinkIndex] || '') : '';
+              const muscleGroup = muscleGroupIndex !== -1 ? (row[muscleGroupIndex] || '') : '';
+              const equipment = resolvedEquipmentIndex !== -1 ? (row[resolvedEquipmentIndex] || '') : '';
+
               if (exerciseName && videoLink) {
                 videoMap[exerciseName] = videoLink;
+              }
+              if (exerciseName) {
+                detailsMap[exerciseName] = { muscleGroup, equipment };
               }
             });
           }
         }
         setExerciseVideoMap(videoMap);
+        setExerciseDetailsMap(detailsMap);
 
         // 6. Fetch WorkoutLog data
         const workoutResponse = await gapi.client.sheets.spreadsheets.values.get({
@@ -507,6 +520,9 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired }
                         )}
                         {exercises.map((exercise, exerciseIndex) => {
                           const videoLink = exerciseVideoMap[exercise.Exercise];
+                          const details = exerciseDetailsMap[exercise.Exercise] || {};
+                          const muscleGroup = details.muscleGroup || '';
+                          const equipment = details.equipment || '';
                           const videoId = getYouTubeVideoId(videoLink);
                           const exerciseKey = `${sectionName}-${exerciseIndex}`;
                           const showVideo = expandedVideos[exerciseKey];
@@ -548,80 +564,89 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired }
                                         gap: '10px'
                                       }}>
                                         <div style={{ fontSize: '1.05em', fontWeight: 600, minWidth: 0, flex: 1 }}>
-                                          {videoLink ? (
-                                            <a
-                                              href={videoLink}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              style={{ color: '#646cff', textDecoration: 'none' }}
-                                              onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
-                                              onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
-                                            >
-                                              {value}
-                                            </a>
-                                          ) : (
-                                            <span>{value}</span>
+                                          <div>
+                                            {videoLink ? (
+                                              <a
+                                                href={videoLink}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                style={{ color: '#646cff', textDecoration: 'none' }}
+                                                onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
+                                                onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
+                                              >
+                                                {value}
+                                              </a>
+                                            ) : (
+                                              <span>{value}</span>
+                                            )}
+                                          </div>
+                                          {(muscleGroup || equipment) && (
+                                            <div style={{ marginTop: '2px', fontSize: '0.8em', color: '#999', fontWeight: 400 }}>
+                                              {muscleGroup}{muscleGroup && equipment ? ' • ' : ''}{equipment}
+                                            </div>
                                           )}
                                         </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
-                                          {videoId && (
-                                            <button
-                                              onClick={() => toggleVideo(exerciseKey)}
-                                              title={showVideo ? 'Hide video' : 'Show video'}
-                                              aria-label={showVideo ? 'Hide video' : 'Show video'}
-                                              style={{
-                                                padding: '2px 8px',
-                                                fontSize: '0.85em',
-                                                backgroundColor: '#333',
-                                                color: '#aaa',
-                                                border: '1px solid #444',
-                                                borderRadius: '3px',
-                                                cursor: 'pointer'
-                                              }}
-                                            >
-                                              📹
-                                            </button>
-                                          )}
-                                          {canEditNotes ? (
-                                            <button
-                                              onClick={() => setEditingNotes(prev => ({
-                                                ...prev,
-                                                [exerciseKey]: notesValue
-                                              }))}
-                                              title={notesValue ? 'Edit notes' : 'Add notes'}
-                                              aria-label={notesValue ? 'Edit notes' : 'Add notes'}
-                                              style={{
-                                                padding: '2px 8px',
-                                                fontSize: '0.85em',
-                                                backgroundColor: '#333',
-                                                color: '#aaa',
-                                                border: '1px solid #444',
-                                                borderRadius: '3px',
-                                                cursor: 'pointer'
-                                              }}
-                                            >
-                                              📝
-                                            </button>
-                                          ) : (
-                                            <button
-                                              onClick={() => {
-                                                if (onAuthRequired) onAuthRequired();
-                                              }}
-                                              title={`Sign in to ${notesValue ? 'edit' : 'add'} notes`}
-                                              aria-label={`Sign in to ${notesValue ? 'edit' : 'add'} notes`}
-                                              style={{
-                                                padding: '2px 8px',
-                                                fontSize: '0.85em',
-                                                backgroundColor: '#646cff',
-                                                color: '#fff',
-                                                border: 'none',
-                                                borderRadius: '3px',
-                                                cursor: 'pointer'
-                                              }}
-                                            >
-                                              📝
-                                            </button>
-                                          )}
+                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', marginLeft: 'auto' }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            {videoId && (
+                                              <button
+                                                onClick={() => toggleVideo(exerciseKey)}
+                                                title={showVideo ? 'Hide video' : 'Show video'}
+                                                aria-label={showVideo ? 'Hide video' : 'Show video'}
+                                                style={{
+                                                  padding: '2px 8px',
+                                                  fontSize: '0.85em',
+                                                  backgroundColor: '#333',
+                                                  color: '#aaa',
+                                                  border: '1px solid #444',
+                                                  borderRadius: '3px',
+                                                  cursor: 'pointer'
+                                                }}
+                                              >
+                                                📹
+                                              </button>
+                                            )}
+                                            {canEditNotes ? (
+                                              <button
+                                                onClick={() => setEditingNotes(prev => ({
+                                                  ...prev,
+                                                  [exerciseKey]: notesValue
+                                                }))}
+                                                title={notesValue ? 'Edit notes' : 'Add notes'}
+                                                aria-label={notesValue ? 'Edit notes' : 'Add notes'}
+                                                style={{
+                                                  padding: '2px 8px',
+                                                  fontSize: '0.85em',
+                                                  backgroundColor: '#333',
+                                                  color: '#aaa',
+                                                  border: '1px solid #444',
+                                                  borderRadius: '3px',
+                                                  cursor: 'pointer'
+                                                }}
+                                              >
+                                                📝
+                                              </button>
+                                            ) : (
+                                              <button
+                                                onClick={() => {
+                                                  if (onAuthRequired) onAuthRequired();
+                                                }}
+                                                title={`Sign in to ${notesValue ? 'edit' : 'add'} notes`}
+                                                aria-label={`Sign in to ${notesValue ? 'edit' : 'add'} notes`}
+                                                style={{
+                                                  padding: '2px 8px',
+                                                  fontSize: '0.85em',
+                                                  backgroundColor: '#646cff',
+                                                  color: '#fff',
+                                                  border: 'none',
+                                                  borderRadius: '3px',
+                                                  cursor: 'pointer'
+                                                }}
+                                              >
+                                                📝
+                                              </button>
+                                            )}
+                                          </div>
                                         </div>
                                       </div>
                                       {showVideo && videoId && (

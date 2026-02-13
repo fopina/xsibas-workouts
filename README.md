@@ -26,18 +26,21 @@ To run this project, you will need to create a `.env` file in the root of the pr
 1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
 2. Create or select your API key
 3. Under **"API restrictions"**, select "Restrict key"
-   - Enable only: **Google Sheets API**
+   - Enable only:
+     - **Google Sheets API**
+     - **Google Picker API**
 4. Under **"Application restrictions"**, select "HTTP referrers (websites)"
-   - Add your production domain(s):
+   - Add your production origin(s):
      - `https://xsibas.pages.dev/*`
      - `https://*.xsibas.pages.dev/*`
    - For local development, also add:
      - `http://localhost:5173/*`
      - `https://localhost:5173/*`
+     - `https://<your-lan-ip>:5173/*` (if using `npm run dev:lan`)
 
 These restrictions ensure the API key can only:
-- Access the Google Sheets API (not other Google services)
-- Be used from your specified domains (prevents unauthorized usage from other websites)
+- Access the required APIs (Sheets + Picker), not other Google services
+- Be used from your specified origins (prevents unauthorized usage from other websites)
 
 ## Authentication Modes
 

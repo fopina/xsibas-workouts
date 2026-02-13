@@ -494,7 +494,13 @@ export function App() {
             </button>
           </form>
           <p style={{ color: '#666', fontSize: '0.8em', marginTop: '1em', wordBreak: 'break-all' }}>
-            Example: https://docs.google.com/spreadsheets/d/1VB5ncABedr88ucuxfE6UdLv9OFKo0foTSJD0Qel6OtE/edit
+            Demo:{' '}
+            <a
+              href="/workout?sheet=1VB5ncABedr88ucuxfE6UdLv9OFKo0foTSJD0Qel6OtE&date=2026-02-11"
+              style={{ color: '#8bc34a', textDecoration: 'none' }}
+            >
+              /workout?sheet=1VB5ncABedr88ucuxfE6UdLv9OFKo0foTSJD0Qel6OtE&date=2026-02-11
+            </a>
           </p>
         </div>
       </div>

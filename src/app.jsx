@@ -239,6 +239,10 @@ export function App() {
     });
   };
 
+  const openInGoogleSheets = (id) => {
+    window.open(`https://docs.google.com/spreadsheets/d/${id}`, '_blank', 'noopener,noreferrer');
+  };
+
   const SheetSelector = () => {
     const history = getSheetsHistory();
     const currentSheetData = sheetId ? history[sheetId] : null;
@@ -277,20 +281,36 @@ export function App() {
               <p style={{ margin: 0, fontSize: '0.9em', color: '#aaa' }}>
                 Currently open:
               </p>
-              <button
-                onClick={unloadSheet}
-                style={{
-                  padding: '0.3em 0.6em',
-                  fontSize: '0.75em',
-                  backgroundColor: '#933',
-                  color: '#fff',
-                  border: '1px solid #a44',
-                  borderRadius: '3px',
-                  cursor: 'pointer'
-                }}
-              >
-                Unload
-              </button>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  onClick={() => openInGoogleSheets(sheetId)}
+                  style={{
+                    padding: '0.3em 0.6em',
+                    fontSize: '0.75em',
+                    backgroundColor: '#333',
+                    color: '#8bc34a',
+                    border: '1px solid #555',
+                    borderRadius: '3px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  GSheets
+                </button>
+                <button
+                  onClick={unloadSheet}
+                  style={{
+                    padding: '0.3em 0.6em',
+                    fontSize: '0.75em',
+                    backgroundColor: '#933',
+                    color: '#fff',
+                    border: '1px solid #a44',
+                    borderRadius: '3px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Unload
+                </button>
+              </div>
             </div>
             <div style={{
               display: 'flex',
@@ -367,34 +387,54 @@ export function App() {
                     {formatRelativeTime(data.lastOpened)}
                   </div>
                 </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteSheetFromHistory(id);
-                  }}
-                  style={{
-                    padding: '0.3em 0.6em',
-                    fontSize: '0.75em',
-                    backgroundColor: '#333',
-                    color: '#999',
-                    border: '1px solid #444',
-                    borderRadius: '3px',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = '#933';
-                    e.target.style.color = '#fff';
-                    e.target.style.borderColor = '#a44';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = '#333';
-                    e.target.style.color = '#999';
-                    e.target.style.borderColor = '#444';
-                  }}
-                >
-                  Delete
-                </button>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openInGoogleSheets(id);
+                    }}
+                    style={{
+                      padding: '0.3em 0.6em',
+                      fontSize: '0.75em',
+                      backgroundColor: '#333',
+                      color: '#8bc34a',
+                      border: '1px solid #555',
+                      borderRadius: '3px',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    GSheets
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteSheetFromHistory(id);
+                    }}
+                    style={{
+                      padding: '0.3em 0.6em',
+                      fontSize: '0.75em',
+                      backgroundColor: '#333',
+                      color: '#999',
+                      border: '1px solid #444',
+                      borderRadius: '3px',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#933';
+                      e.target.style.color = '#fff';
+                      e.target.style.borderColor = '#a44';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#333';
+                      e.target.style.color = '#999';
+                      e.target.style.borderColor = '#444';
+                    }}
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -454,7 +494,13 @@ export function App() {
             </button>
           </form>
           <p style={{ color: '#666', fontSize: '0.8em', marginTop: '1em', wordBreak: 'break-all' }}>
-            Example: https://docs.google.com/spreadsheets/d/1VB5ncABedr88ucuxfE6UdLv9OFKo0foTSJD0Qel6OtE/edit
+            Demo:{' '}
+            <a
+              href="/workout?sheet=1VB5ncABedr88ucuxfE6UdLv9OFKo0foTSJD0Qel6OtE&date=2026-02-11"
+              style={{ color: '#8bc34a', textDecoration: 'none' }}
+            >
+              /workout?sheet=1VB5ncABedr88ucuxfE6UdLv9OFKo0foTSJD0Qel6OtE&date=2026-02-11
+            </a>
           </p>
         </div>
       </div>

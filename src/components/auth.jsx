@@ -107,12 +107,7 @@ const Auth = ({ onAuthChange, forceLogoutVersion = 0 }) => {
   useEffect(() => {
     if (forceLogoutVersion === 0) return;
 
-    const tokenToRevoke = accessToken;
     clearAuthState();
-
-    if (tokenToRevoke && window.google?.accounts?.oauth2?.revoke) {
-      window.google.accounts.oauth2.revoke(tokenToRevoke, () => {});
-    }
   }, [forceLogoutVersion]);
 
   return (

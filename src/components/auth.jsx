@@ -3,10 +3,18 @@ import { useState, useEffect } from 'preact/hooks';
 const STORAGE_KEY = 'google_access_token';
 const USER_NAME_KEY = 'google_user_name';
 
-const Auth = ({ onAuthChange }) => {
+const Auth = ({ onAuthChange, forceLogoutVersion = 0 }) => {
   const [tokenClient, setTokenClient] = useState(null);
   const [accessToken, setAccessToken] = useState(null);
   const [userName, setUserName] = useState(null);
+
+  const clearAuthState = () => {
+    setAccessToken(null);
+    setUserName(null);
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(USER_NAME_KEY);
+    onAuthChange(null);
+  };
 
   // Restore token and user name from localStorage on mount
   useEffect(() => {
@@ -86,16 +94,21 @@ const Auth = ({ onAuthChange }) => {
   };
 
   const handleLogout = () => {
-    if (accessToken) {
-      window.google.accounts.oauth2.revoke(accessToken, () => {
-        setAccessToken(null);
-        setUserName(null);
-        localStorage.removeItem(STORAGE_KEY);
-        localStorage.removeItem(USER_NAME_KEY);
-        onAuthChange(null);
-      });
+    const tokenToRevoke = accessToken;
+    clearAuthState();
+
+    if (tokenToRevoke && window.google?.accounts?.oauth2?.revoke) {
+      // Revoke in background; do not block local logout on callback.
+      window.google.accounts.oauth2.revoke(tokenToRevoke, () => {});
     }
   };
+
+  // Force logout when session is detected as expired by API calls.
+  useEffect(() => {
+    if (forceLogoutVersion === 0) return;
+
+    clearAuthState();
+  }, [forceLogoutVersion]);
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>

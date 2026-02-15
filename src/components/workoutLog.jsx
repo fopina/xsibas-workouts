@@ -677,13 +677,13 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                                   return (
                                     <div key={key} style={{ marginTop: '10px', marginBottom: '5px' }}>
                                       <div style={{ marginTop: '5px' }}>
-                                        {value && (
+                                        {notesValue && (
                                           <div style={{
                                             color: '#aaa',
                                             fontStyle: 'italic',
                                             marginBottom: '4px'
                                           }}>
-                                            {value}
+                                            {notesValue}
                                           </div>
                                         )}
                                       </div>
@@ -754,7 +754,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                                               color: '#aaa',
                                               marginBottom: '4px'
                                             }}>
-                                              <strong>Section Score:</strong> {sectionScoreValue}
+                                              🕒 {sectionScoreValue}
                                             </div>
                                           )}
                                         </div>

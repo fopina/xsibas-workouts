@@ -11,8 +11,8 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
   const [expandedVideos, setExpandedVideos] = useState({});
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [editingNotes, setEditingNotes] = useState({}); // Track which notes are being edited
-  const [savingNotes, setSavingNotes] = useState({}); // Track which notes are being saved
+  const [editingSectionScores, setEditingSectionScores] = useState({}); // Track which section scores are being edited
+  const [savingSectionScores, setSavingSectionScores] = useState({}); // Track which section scores are being saved
 
   // Initialize selected date from URL or default to today
   const getInitialDate = () => {
@@ -235,9 +235,12 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
             headers.forEach((header, index) => {
               workout[header] = row[index] || ''; // Ensure empty cells are handled
             });
-            // Ensure every workout has a Notes field even if column doesn't exist
+            // Ensure every workout has expected optional fields even if columns don't exist
             if (!('Notes' in workout)) {
               workout.Notes = '';
+            }
+            if (!('Section Score' in workout)) {
+              workout['Section Score'] = '';
             }
             return workout;
           });
@@ -336,74 +339,74 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
     return date.toDateString() === selectedDate.toDateString();
   };
 
-  // Function to update notes in the spreadsheet
-  const updateNotes = async (rowIndex, newNotes, exerciseKey) => {
+  // Function to update section score in the spreadsheet
+  const updateSectionScore = async (rowIndex, newSectionScore, exerciseKey) => {
     if (!accessToken) {
-      alert('Please sign in to edit notes');
+      alert('Please sign in to edit section score');
       if (onAuthRequired) onAuthRequired();
       return;
     }
 
-    setSavingNotes(prev => ({ ...prev, [exerciseKey]: true }));
+    setSavingSectionScores(prev => ({ ...prev, [exerciseKey]: true }));
 
     try {
-      // Find the Notes column index
+      // Find the Section Score column index
       const response = await gapi.client.sheets.spreadsheets.values.get({
         spreadsheetId: sheetId,
         range: 'WorkoutLog!A1:Z1',
       });
 
       const headers = response.result.values[0];
-      let notesColumnIndex = headers.indexOf('Notes');
+      let sectionScoreColumnIndex = headers.indexOf('Section Score');
 
-      // If Notes column doesn't exist, we need to add it
-      if (notesColumnIndex === -1) {
-        notesColumnIndex = headers.length;
-        // Add Notes header if it doesn't exist
+      // If Section Score column doesn't exist, we need to add it
+      if (sectionScoreColumnIndex === -1) {
+        sectionScoreColumnIndex = headers.length;
+        // Add Section Score header if it doesn't exist
         await gapi.client.sheets.spreadsheets.values.update({
           spreadsheetId: sheetId,
-          range: `WorkoutLog!${String.fromCharCode(65 + notesColumnIndex)}1`,
+          range: `WorkoutLog!${String.fromCharCode(65 + sectionScoreColumnIndex)}1`,
           valueInputOption: 'RAW',
           resource: {
-            values: [['Notes']]
+            values: [['Section Score']]
           }
         });
       }
 
       // Convert column index to letter (A, B, C, ...)
-      const columnLetter = String.fromCharCode(65 + notesColumnIndex);
+      const columnLetter = String.fromCharCode(65 + sectionScoreColumnIndex);
       // Row index in sheet is rowIndex + 2 (1 for header, 1 for 0-based to 1-based)
       const cellRange = `WorkoutLog!${columnLetter}${rowIndex + 2}`;
 
-      // Update the notes cell
+      // Update the section score cell
       await gapi.client.sheets.spreadsheets.values.update({
         spreadsheetId: sheetId,
         range: cellRange,
         valueInputOption: 'RAW',
         resource: {
-          values: [[newNotes]]
+          values: [[newSectionScore]]
         }
       });
 
       // Update local state
       setWorkouts(prev => {
         const updated = [...prev];
-        updated[rowIndex] = { ...updated[rowIndex], Notes: newNotes };
+        updated[rowIndex] = { ...updated[rowIndex], ['Section Score']: newSectionScore };
         return updated;
       });
 
       // Clear editing state
-      setEditingNotes(prev => {
+      setEditingSectionScores(prev => {
         const updated = { ...prev };
         delete updated[exerciseKey];
         return updated;
       });
 
     } catch (err) {
-      console.error("Error updating notes:", err);
-      alert(`Error updating notes: ${err.result?.error?.message || err.message}`);
+      console.error("Error updating section score:", err);
+      alert(`Error updating section score: ${err.result?.error?.message || err.message}`);
     } finally {
-      setSavingNotes(prev => {
+      setSavingSectionScores(prev => {
         const updated = { ...prev };
         delete updated[exerciseKey];
         return updated;
@@ -528,9 +531,10 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                           const exerciseKey = `${sectionName}-${exerciseIndex}`;
                           const showVideo = expandedVideos[exerciseKey];
                           const notesValue = exercise.Notes || '';
-                          const isEditingNotes = exerciseKey in editingNotes;
-                          const isSavingNotes = exerciseKey in savingNotes;
-                          const canEditNotes = !!accessToken;
+                          const sectionScoreValue = exercise['Section Score'] || '';
+                          const isEditingSectionScore = exerciseKey in editingSectionScores;
+                          const isSavingSectionScore = exerciseKey in savingSectionScores;
+                          const canEditSectionScore = !!accessToken;
 
                           // Find the row index in the original workouts array for this exercise
                           const rowIndex = workouts.findIndex(w =>
@@ -548,9 +552,10 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                               border: '1px solid #333'
                             }}>
                               {Object.entries(exercise).map(([key, value]) => {
-                                // Skip Date, Section, Section Prescription, and Day as they're already shown
+                                // Skip Date, Section, Section Prescription, Day, and Section Score as they're already shown
                                 // Don't skip empty Notes field - we want to show it for editing
                                 if (key === 'Date' || key === 'Section' || key === 'Section Prescription' || key === 'Day') return null;
+                                if (key === 'Section Score') return null;
                                 if (!value && key !== 'Notes') return null;
 
                                 // Special handling for Exercise field - larger text, optional video actions
@@ -607,14 +612,14 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                                                 📹
                                               </button>
                                             )}
-                                            {canEditNotes ? (
+                                            {canEditSectionScore ? (
                                               <button
-                                                onClick={() => setEditingNotes(prev => ({
+                                                onClick={() => setEditingSectionScores(prev => ({
                                                   ...prev,
-                                                  [exerciseKey]: notesValue
+                                                  [exerciseKey]: sectionScoreValue
                                                 }))}
-                                                title={notesValue ? 'Edit notes' : 'Add notes'}
-                                                aria-label={notesValue ? 'Edit notes' : 'Add notes'}
+                                                title={sectionScoreValue ? 'Edit section score' : 'Add section score'}
+                                                aria-label={sectionScoreValue ? 'Edit section score' : 'Add section score'}
                                                 style={{
                                                   padding: '2px 8px',
                                                   fontSize: '0.85em',
@@ -632,8 +637,8 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                                                 onClick={() => {
                                                   if (onAuthRequired) onAuthRequired();
                                                 }}
-                                                title={`Sign in to ${notesValue ? 'edit' : 'add'} notes`}
-                                                aria-label={`Sign in to ${notesValue ? 'edit' : 'add'} notes`}
+                                                title={`Sign in to ${sectionScoreValue ? 'edit' : 'add'} section score`}
+                                                aria-label={`Sign in to ${sectionScoreValue ? 'edit' : 'add'} section score`}
                                                 style={{
                                                   padding: '2px 8px',
                                                   fontSize: '0.85em',
@@ -667,15 +672,26 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                                   );
                                 }
 
-                                // Special handling for Notes field - make it editable (only when authenticated)
+                                // Special handling for Notes field - read-only; section score is editable below it
                                 if (key === 'Notes') {
                                   return (
                                     <div key={key} style={{ marginTop: '10px', marginBottom: '5px' }}>
-                                      {isEditingNotes ? (
+                                      <div style={{ marginTop: '5px' }}>
+                                        {value && (
+                                          <div style={{
+                                            color: '#aaa',
+                                            fontStyle: 'italic',
+                                            marginBottom: '4px'
+                                          }}>
+                                            {value}
+                                          </div>
+                                        )}
+                                      </div>
+                                      {isEditingSectionScore ? (
                                         <div style={{ marginTop: '5px' }}>
                                           <textarea
-                                            value={editingNotes[exerciseKey] || ''}
-                                            onChange={(e) => setEditingNotes(prev => ({
+                                            value={editingSectionScores[exerciseKey] || ''}
+                                            onChange={(e) => setEditingSectionScores(prev => ({
                                               ...prev,
                                               [exerciseKey]: e.target.value
                                             }))}
@@ -691,12 +707,12 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                                               fontFamily: 'inherit',
                                               resize: 'vertical'
                                             }}
-                                            placeholder="Add your notes here..."
+                                            placeholder="Add section score here..."
                                           />
                                           <div style={{ marginTop: '5px', display: 'flex', gap: '5px' }}>
                                             <button
-                                              onClick={() => updateNotes(rowIndex, editingNotes[exerciseKey] || '', exerciseKey)}
-                                              disabled={isSavingNotes}
+                                              onClick={() => updateSectionScore(rowIndex, editingSectionScores[exerciseKey] || '', exerciseKey)}
+                                              disabled={isSavingSectionScore}
                                               style={{
                                                 padding: '5px 10px',
                                                 fontSize: '0.85em',
@@ -704,19 +720,19 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                                                 color: '#fff',
                                                 border: 'none',
                                                 borderRadius: '4px',
-                                                cursor: isSavingNotes ? 'not-allowed' : 'pointer',
-                                                opacity: isSavingNotes ? 0.6 : 1
+                                                cursor: isSavingSectionScore ? 'not-allowed' : 'pointer',
+                                                opacity: isSavingSectionScore ? 0.6 : 1
                                               }}
                                             >
-                                              {isSavingNotes ? 'Saving...' : 'Save'}
+                                              {isSavingSectionScore ? 'Saving...' : 'Save'}
                                             </button>
                                             <button
-                                              onClick={() => setEditingNotes(prev => {
+                                              onClick={() => setEditingSectionScores(prev => {
                                                 const updated = { ...prev };
                                                 delete updated[exerciseKey];
                                                 return updated;
                                               })}
-                                              disabled={isSavingNotes}
+                                              disabled={isSavingSectionScore}
                                               style={{
                                                 padding: '5px 10px',
                                                 fontSize: '0.85em',
@@ -724,7 +740,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                                                 color: '#aaa',
                                                 border: '1px solid #444',
                                                 borderRadius: '4px',
-                                                cursor: isSavingNotes ? 'not-allowed' : 'pointer'
+                                                cursor: isSavingSectionScore ? 'not-allowed' : 'pointer'
                                               }}
                                             >
                                               Cancel
@@ -733,13 +749,12 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                                         </div>
                                       ) : (
                                         <div style={{ marginTop: '5px' }}>
-                                          {value && (
+                                          {sectionScoreValue && (
                                             <div style={{
                                               color: '#aaa',
-                                              fontStyle: 'italic',
                                               marginBottom: '4px'
                                             }}>
-                                              {value}
+                                              <strong>Section Score:</strong> {sectionScoreValue}
                                             </div>
                                           )}
                                         </div>

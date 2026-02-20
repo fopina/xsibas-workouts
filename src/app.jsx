@@ -18,6 +18,8 @@ export function App() {
   const [showSheetSelector, setShowSheetSelector] = useState(false);
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const [isStandalonePwa, setIsStandalonePwa] = useState(false);
+  const [shareMessage, setShareMessage] = useState('');
 
   // Simple router: listen to popstate and update current path
   useEffect(() => {
@@ -40,6 +42,8 @@ export function App() {
                          window.navigator.standalone ||
                          document.referrer.includes('android-app://');
 
+    setIsStandalonePwa(Boolean(isStandalone));
+
     const hasBeenDismissed = localStorage.getItem('installBannerDismissed') === 'true';
 
     if (!isStandalone && !hasBeenDismissed) {
@@ -50,6 +54,39 @@ export function App() {
   const dismissInstallBanner = () => {
     setShowInstallBanner(false);
     localStorage.setItem('installBannerDismissed', 'true');
+  };
+
+  const showShareFeedback = (message) => {
+    setShareMessage(message);
+    setTimeout(() => setShareMessage(''), 2000);
+  };
+
+  const shareCurrentUrl = async () => {
+    const url = window.location.href;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: document.title || 'Workout Planner',
+          url
+        });
+        return;
+      }
+
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+        showShareFeedback('Link copied');
+        return;
+      }
+
+      window.prompt('Copy this URL:', url);
+    } catch (error) {
+      if (error?.name === 'AbortError') {
+        return;
+      }
+      console.error('Failed to share URL:', error);
+      showShareFeedback('Share failed');
+    }
   };
 
   // Prevent screen sleep throughout the app
@@ -548,6 +585,20 @@ export function App() {
           }}
         />
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {isStandalonePwa && (
+            <button
+              onClick={shareCurrentUrl}
+              style={{
+                padding: '0.4em 0.7em',
+                fontSize: '0.8em',
+                backgroundColor: '#333',
+                border: '1px solid #555',
+                cursor: 'pointer'
+              }}
+            >
+              Share
+            </button>
+          )}
           {sheetId && (
             <button
               onClick={() => setShowSheetSelector(true)}
@@ -566,6 +617,21 @@ export function App() {
         </div>
       </header>
       <main>
+        {shareMessage && (
+          <div style={{
+            backgroundColor: '#1a2a1a',
+            border: '1px solid #4a7c4a',
+            borderRadius: '4px',
+            padding: '0.5em 0.75em',
+            marginBottom: '0.75em',
+            fontSize: '0.85em',
+            color: '#8bc34a',
+            textAlign: 'center'
+          }}>
+            {shareMessage}
+          </div>
+        )}
+
         {/* Install to home screen banner */}
         {showInstallBanner && (
           <div style={{

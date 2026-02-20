@@ -8,6 +8,8 @@ import './app.css';
 const gapi = window.gapi;
 
 const SHEETS_HISTORY_KEY = 'workout_sheets_history';
+const LAST_VIEW_KEY = 'workout_last_view';
+const getCurrentRoute = () => `${window.location.pathname}${window.location.search}`;
 
 export function App() {
   const [accessToken, setAccessToken] = useState(null);
@@ -16,7 +18,7 @@ export function App() {
   const [sheetId, setSheetId] = useState('');
   const [inputValue, setInputValue] = useState('');
   const [showSheetSelector, setShowSheetSelector] = useState(false);
-  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+  const [currentPath, setCurrentPath] = useState(getCurrentRoute());
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [isStandalonePwa, setIsStandalonePwa] = useState(false);
   const [shareMessage, setShareMessage] = useState('');
@@ -24,7 +26,7 @@ export function App() {
   // Simple router: listen to popstate and update current path
   useEffect(() => {
     const handlePopState = () => {
-      setCurrentPath(window.location.pathname);
+      setCurrentPath(getCurrentRoute());
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -33,7 +35,7 @@ export function App() {
   // Navigate function
   const navigate = (path) => {
     window.history.pushState({}, '', path);
-    setCurrentPath(path);
+    setCurrentPath(getCurrentRoute());
   };
 
   // Detect if running as standalone PWA
@@ -45,6 +47,14 @@ export function App() {
     setIsStandalonePwa(Boolean(isStandalone));
 
     const hasBeenDismissed = localStorage.getItem('installBannerDismissed') === 'true';
+
+    if (isStandalone && window.location.pathname === '/') {
+      const lastView = localStorage.getItem(LAST_VIEW_KEY);
+      if (lastView && lastView !== '/') {
+        window.history.replaceState({}, '', lastView);
+        setCurrentPath(getCurrentRoute());
+      }
+    }
 
     if (!isStandalone && !hasBeenDismissed) {
       setShowInstallBanner(true);
@@ -200,14 +210,21 @@ export function App() {
   };
 
   useEffect(() => {
-    // Extract sheet ID from URL query parameter
+    // Persist last non-root route so standalone PWA can restore it on reopen.
+    if (window.location.pathname !== '/') {
+      localStorage.setItem(LAST_VIEW_KEY, getCurrentRoute());
+    }
+
+    // Keep selected sheet in sync with URL whenever route/query changes.
     const params = new URLSearchParams(window.location.search);
     const urlSheetId = params.get('sheet');
     if (urlSheetId) {
       setSheetId(urlSheetId);
       saveSheetToHistory(urlSheetId);
+    } else {
+      setSheetId('');
     }
-  }, []);
+  }, [currentPath]);
 
   useEffect(() => {
     // This effect handles the loading of the GAPI client library
@@ -546,7 +563,7 @@ export function App() {
   };
 
   // Show landing page for root path
-  if (currentPath === '/') {
+  if (new URL(currentPath, window.location.origin).pathname === '/') {
     return (
       <div class="app-container">
         <main>

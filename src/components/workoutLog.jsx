@@ -14,13 +14,27 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
   const [editingSectionScores, setEditingSectionScores] = useState({}); // Track which section scores are being edited
   const [savingSectionScores, setSavingSectionScores] = useState({}); // Track which section scores are being saved
 
+  const parseLocalDateString = (value) => {
+    if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+    const [year, month, day] = value.split('-').map(Number);
+    const parsedDate = new Date(year, month - 1, day);
+    return isNaN(parsedDate.getTime()) ? null : parsedDate;
+  };
+
+  const toDateKey = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   // Initialize selected date from URL or default to today
   const getInitialDate = () => {
     const params = new URLSearchParams(window.location.search);
     const dateParam = params.get('date');
     if (dateParam) {
-      const parsedDate = new Date(dateParam);
-      if (!isNaN(parsedDate.getTime())) {
+      const parsedDate = parseLocalDateString(dateParam);
+      if (parsedDate) {
         return parsedDate;
       }
     }
@@ -41,7 +55,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
 
   // Update URL when selected date changes
   useEffect(() => {
-    const dateStr = selectedDate.toISOString().split('T')[0];
+    const dateStr = toDateKey(selectedDate);
     const params = new URLSearchParams(window.location.search);
     params.set('date', dateStr);
     const newUrl = `${window.location.pathname}?${params.toString()}`;
@@ -312,13 +326,13 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
   
   // Helper function to check if a date has workouts
   const hasWorkout = (date) => {
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = toDateKey(date);
     return workouts.some(workout => workout.Date === dateStr);
   };
 
   // Helper function to get workouts for a specific date
   const getWorkoutsForDate = (date) => {
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = toDateKey(date);
     return workouts.filter(workout => workout.Date === dateStr);
   };
 

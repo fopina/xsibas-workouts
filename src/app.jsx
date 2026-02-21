@@ -23,13 +23,53 @@ export function App() {
   const [isStandalonePwa, setIsStandalonePwa] = useState(false);
   const [shareMessage, setShareMessage] = useState('');
 
-  // Simple router: listen to popstate and update current path
+  // Simple router: keep state in sync for popstate + pushState/replaceState.
   useEffect(() => {
-    const handlePopState = () => {
+    const syncCurrentPath = () => {
       setCurrentPath(getCurrentRoute());
     };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+
+    const originalPushState = window.history.pushState;
+    const originalReplaceState = window.history.replaceState;
+    const dispatchLocationChange = () => window.dispatchEvent(new Event('locationchange'));
+
+    window.history.pushState = function(...args) {
+      const result = originalPushState.apply(this, args);
+      dispatchLocationChange();
+      return result;
+    };
+
+    window.history.replaceState = function(...args) {
+      const result = originalReplaceState.apply(this, args);
+      dispatchLocationChange();
+      return result;
+    };
+
+    const persistLastView = () => {
+      if (window.location.pathname !== '/') {
+        localStorage.setItem(LAST_VIEW_KEY, getCurrentRoute());
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        persistLastView();
+      }
+    };
+
+    window.addEventListener('popstate', syncCurrentPath);
+    window.addEventListener('locationchange', syncCurrentPath);
+    window.addEventListener('pagehide', persistLastView);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.history.pushState = originalPushState;
+      window.history.replaceState = originalReplaceState;
+      window.removeEventListener('popstate', syncCurrentPath);
+      window.removeEventListener('locationchange', syncCurrentPath);
+      window.removeEventListener('pagehide', persistLastView);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   // Navigate function

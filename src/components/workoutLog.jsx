@@ -431,20 +431,34 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h2>Workout Log</h2>
-        <button
-          onClick={() => {
-            const newMode = viewMode === 'week' ? 'month' : 'week';
-            if (newMode === 'month') {
-              // Set currentMonth to the month of the selected date
-              setCurrentMonth(new Date(selectedDate));
-            }
-            setViewMode(newMode);
-          }}
-          style={{ fontSize: '0.9em', padding: '0.5em 1em' }}
-        >
-          {viewMode === 'week' ? 'Month View' : 'Week View'}
-        </button>
+        <h2>Workout</h2>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            onClick={() => {
+              const today = new Date();
+              setSelectedDate(today);
+              if (viewMode === 'month') {
+                setCurrentMonth(today);
+              }
+            }}
+            style={{ fontSize: '0.9em', padding: '0.5em 1em' }}
+          >
+            Today
+          </button>
+          <button
+            onClick={() => {
+              const newMode = viewMode === 'week' ? 'month' : 'week';
+              if (newMode === 'month') {
+                // Set currentMonth to the month of the selected date
+                setCurrentMonth(new Date(selectedDate));
+              }
+              setViewMode(newMode);
+            }}
+            style={{ fontSize: '0.9em', padding: '0.5em 1em' }}
+          >
+            {viewMode === 'week' ? 'Month View' : 'Week View'}
+          </button>
+        </div>
       </div>
 
       {viewMode === 'week' ? (
@@ -471,7 +485,9 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                     textAlign: 'center',
                     borderRadius: '8px',
                     cursor: 'pointer',
-                    backgroundColor: hasWorkoutOnDate ? '#2d5016' : '#333',
+                    backgroundColor: hasWorkoutOnDate
+                      ? (isTodayDate ? '#4f7a2a' : '#2d5016')
+                      : (isTodayDate ? '#4a4a4a' : '#333'),
                     border: isSelected ? '2px solid #646cff' : isTodayDate ? '2px solid #555' : '1px solid #444',
                     transition: 'all 0.2s',
                     minWidth: 0
@@ -837,7 +853,9 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                     textAlign: 'center',
                     borderRadius: '5px',
                     cursor: 'pointer',
-                    backgroundColor: hasWorkoutOnDate ? '#2d5016' : '#333',
+                    backgroundColor: hasWorkoutOnDate
+                      ? (isTodayDate ? '#4f7a2a' : '#2d5016')
+                      : (isTodayDate ? '#4a4a4a' : '#333'),
                     border: isSelected ? '2px solid #646cff' : isTodayDate ? '2px solid #555' : '1px solid #444',
                     opacity: isCurrentMonth ? 1 : 0.4,
                     transition: 'all 0.2s'

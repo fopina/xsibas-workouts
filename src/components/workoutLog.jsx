@@ -20,7 +20,20 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
   const nowMs = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
   const logPerf = (phase, startMs, details = {}) => {
     const durationMs = Math.round(nowMs() - startMs);
-    console.info(`[WorkoutLog][Perf] ${phase}: ${durationMs}ms`, details);
+    console.info(`[WorkoutLog][Perf] ${phase}: ${durationMs}ms ${safeLogDetails(details)}`);
+  };
+  const safeLogDetails = (details) => {
+    try {
+      return JSON.stringify(details);
+    } catch {
+      return String(details);
+    }
+  };
+  const logWarn = (message, details = {}) => {
+    console.warn(`${message} ${safeLogDetails(details)}`);
+  };
+  const logError = (message, details = {}) => {
+    console.error(`${message} ${safeLogDetails(details)}`);
   };
 
   const parseLocalDateString = (value) => {
@@ -105,46 +118,84 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
   const isUnauthenticatedApiError = (err) => {
     const errorMessage = err?.result?.error?.message || err?.message || '';
     const errorStatus = err?.result?.error?.status || err?.status || '';
+    const errorCode = err?.result?.error?.code || err?.code || 0;
+    const errorReason = err?.result?.error?.errors?.[0]?.reason || '';
+    const lowerMessage = String(errorMessage).toLowerCase();
+
     return errorStatus === 'UNAUTHENTICATED' ||
+      errorReason === 'authError' ||
       errorMessage.includes('Invalid Credentials') ||
-      errorMessage.includes('invalid authentication');
+      errorMessage.includes('invalid authentication') ||
+      ((errorStatus === 'PERMISSION_DENIED' || errorCode === 403) && (
+        lowerMessage.includes('authentication credentials') ||
+        lowerMessage.includes('invalid credentials') ||
+        lowerMessage.includes('login required') ||
+        lowerMessage.includes('auth')
+      ));
+  };
+
+  const isRefreshableAuthenticatedError = (err) => {
+    if (!accessToken) return false;
+    const errorStatus = err?.result?.error?.status || err?.status || '';
+    const errorCode = err?.result?.error?.code || err?.code || 0;
+    return isUnauthenticatedApiError(err) || errorStatus === 'PERMISSION_DENIED' || errorCode === 403;
   };
 
   const trySilentRefreshAfterAuthError = async (err, context) => {
     const errorMessage = err?.result?.error?.message || err?.message || '';
     const errorStatus = err?.result?.error?.status || err?.status || '';
     const errorCode = err?.result?.error?.code || err?.code || '';
+    const errorReason = err?.result?.error?.errors?.[0]?.reason || '';
+
+    logWarn('[WorkoutLog] Sheets API error caught', {
+      context,
+      errorStatus,
+      errorCode,
+      errorReason,
+      errorMessage
+    });
 
     if (!accessToken || !onAuthRefreshRequested) {
-      console.warn('[WorkoutLog] Auth error refresh path unavailable', {
+      logWarn('[WorkoutLog] Auth error refresh path unavailable', {
         context,
         hasAccessToken: !!accessToken,
         hasRefreshHandler: !!onAuthRefreshRequested,
         errorStatus,
         errorCode,
+        errorReason,
         errorMessage
       });
       return null;
     }
-    if (!isUnauthenticatedApiError(err)) return null;
+    if (!isRefreshableAuthenticatedError(err)) {
+      logWarn('[WorkoutLog] Error is not classified as refreshable auth failure', {
+        context,
+        errorStatus,
+        errorCode,
+        errorReason,
+        errorMessage
+      });
+      return null;
+    }
 
-    console.warn('[WorkoutLog] Access token failed for Sheets API call, attempting silent refresh', {
+    logWarn('[WorkoutLog] Access token failed for Sheets API call, attempting silent refresh', {
       context,
       errorStatus,
       errorCode,
+      errorReason,
       errorMessage
     });
 
     try {
       const refreshedToken = await onAuthRefreshRequested();
       if (refreshedToken) {
-        console.info('[WorkoutLog] Silent refresh returned a new access token', { context });
+        console.info(`[WorkoutLog] Silent refresh returned a new access token ${safeLogDetails({ context })}`);
         return refreshedToken;
       }
-      console.warn('[WorkoutLog] Silent refresh returned no token', { context });
+      logWarn('[WorkoutLog] Silent refresh returned no token', { context });
       return null;
     } catch (refreshErr) {
-      console.error('[WorkoutLog] Silent refresh request failed', {
+      logError('[WorkoutLog] Silent refresh request failed', {
         context,
         error: refreshErr?.message || refreshErr
       });

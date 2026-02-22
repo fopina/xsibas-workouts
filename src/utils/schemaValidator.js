@@ -15,10 +15,11 @@ const EXPECTED_SCHEMA = {
  * Validates the spreadsheet schema
  * @param {Object} gapi - Google API client
  * @param {string} sheetId - Spreadsheet ID
- * @returns {Promise<{valid: boolean, errors: string[]}>}
+ * @returns {Promise<{valid: boolean, errors: string[], sheetHeaders?: Record<string, string[]>}>}
  */
 export async function validateSpreadsheetSchema(gapi, sheetId) {
   const errors = [];
+  const sheetHeaders = {};
 
   // 1. Get spreadsheet metadata to check sheet names
   // This is outside try/catch to let auth/permission errors bubble up
@@ -42,36 +43,50 @@ export async function validateSpreadsheetSchema(gapi, sheetId) {
     return { valid: false, errors };
   }
 
-  // 3. Check headers for each sheet
-  for (const [sheetName, expectedHeaders] of Object.entries(EXPECTED_SCHEMA.headers)) {
-    try {
-      const headerResponse = await gapi.client.sheets.spreadsheets.values.get({
-        spreadsheetId: sheetId,
-        range: `${sheetName}!1:1`
-      });
+  // 3. Check headers for each sheet (parallelized)
+  const headerChecks = await Promise.all(
+    Object.entries(EXPECTED_SCHEMA.headers).map(async ([sheetName, expectedHeaders]) => {
+      try {
+        const headerResponse = await gapi.client.sheets.spreadsheets.values.get({
+          spreadsheetId: sheetId,
+          range: `${sheetName}!1:1`
+        });
 
-      const actualHeaders = headerResponse.result.values?.[0] || [];
-
-      // Check that all expected headers are present
-      for (const expectedHeader of expectedHeaders) {
-        if (!actualHeaders.includes(expectedHeader)) {
-          errors.push(`Sheet "${sheetName}" is missing required column: "${expectedHeader}"`);
-        }
+        return {
+          sheetName,
+          expectedHeaders,
+          actualHeaders: headerResponse.result.values?.[0] || [],
+          error: null
+        };
+      } catch (err) {
+        return { sheetName, expectedHeaders, actualHeaders: [], error: err };
       }
+    })
+  );
 
-      // Check if sheet is empty (no headers at all)
-      if (actualHeaders.length === 0) {
-        errors.push(`Sheet "${sheetName}" appears to be empty (no headers found)`);
+  for (const { sheetName, expectedHeaders, actualHeaders, error } of headerChecks) {
+    if (error) {
+      errors.push(`Failed to read headers from sheet "${sheetName}": ${error.message}`);
+      continue;
+    }
+
+    sheetHeaders[sheetName] = actualHeaders;
+
+    for (const expectedHeader of expectedHeaders) {
+      if (!actualHeaders.includes(expectedHeader)) {
+        errors.push(`Sheet "${sheetName}" is missing required column: "${expectedHeader}"`);
       }
+    }
 
-    } catch (err) {
-      errors.push(`Failed to read headers from sheet "${sheetName}": ${err.message}`);
+    if (actualHeaders.length === 0) {
+      errors.push(`Sheet "${sheetName}" appears to be empty (no headers found)`);
     }
   }
 
   return {
     valid: errors.length === 0,
-    errors
+    errors,
+    sheetHeaders
   };
 }
 

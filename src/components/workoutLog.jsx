@@ -240,23 +240,41 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
           return;
         }
 
-        try {
-          const metadataResponse = await gapi.client.sheets.spreadsheets.get({
-            spreadsheetId: sheetId,
-            fields: 'properties.title'
-          });
-          const sheetTitle = metadataResponse.result.properties?.title;
-          if (!cancelled && sheetTitle && onSheetTitleLoaded) {
-            onSheetTitleLoaded(sheetId, sheetTitle);
-          }
-        } catch (err) {
-          console.warn('Could not fetch sheet title:', err);
+        const headers = validation.sheetHeaders?.WorkoutLog || [];
+        const dateColumnIndex = headers.indexOf('Date');
+        if (dateColumnIndex === -1) {
+          throw new Error('WorkoutLog sheet is missing a Date column.');
         }
 
-        const exercisesResponse = await gapi.client.sheets.spreadsheets.values.get({
-          spreadsheetId: sheetId,
-          range: 'Exercises!A:Z',
-        });
+        const dateColumnLetter = columnIndexToLetter(dateColumnIndex);
+        const metadataPromise = (async () => {
+          try {
+            return await gapi.client.sheets.spreadsheets.get({
+              spreadsheetId: sheetId,
+              fields: 'properties.title'
+            });
+          } catch (err) {
+            console.warn('Could not fetch sheet title:', err);
+            return null;
+          }
+        })();
+
+        const [metadataResponse, exercisesResponse, datesResponse] = await Promise.all([
+          metadataPromise,
+          gapi.client.sheets.spreadsheets.values.get({
+            spreadsheetId: sheetId,
+            range: 'Exercises!A:Z',
+          }),
+          gapi.client.sheets.spreadsheets.values.get({
+            spreadsheetId: sheetId,
+            range: `WorkoutLog!${dateColumnLetter}2:${dateColumnLetter}`,
+          })
+        ]);
+
+        const sheetTitle = metadataResponse?.result?.properties?.title;
+        if (!cancelled && sheetTitle && onSheetTitleLoaded) {
+          onSheetTitleLoaded(sheetId, sheetTitle);
+        }
 
         const exercisesData = exercisesResponse.result.values;
         const videoMap = {};
@@ -286,22 +304,6 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
             });
           }
         }
-
-        const headerResponse = await gapi.client.sheets.spreadsheets.values.get({
-          spreadsheetId: sheetId,
-          range: 'WorkoutLog!A1:Z1',
-        });
-        const headers = headerResponse.result.values?.[0] || [];
-        const dateColumnIndex = headers.indexOf('Date');
-        if (dateColumnIndex === -1) {
-          throw new Error('WorkoutLog sheet is missing a Date column.');
-        }
-
-        const dateColumnLetter = columnIndexToLetter(dateColumnIndex);
-        const datesResponse = await gapi.client.sheets.spreadsheets.values.get({
-          spreadsheetId: sheetId,
-          range: `WorkoutLog!${dateColumnLetter}2:${dateColumnLetter}`,
-        });
 
         const dateRowsMap = {};
         (datesResponse.result.values || []).forEach((row, index) => {

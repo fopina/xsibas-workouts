@@ -129,6 +129,12 @@ The app uses the Screen Wake Lock API to prevent mobile devices from sleeping du
 - `npm run build` - Production build
 - `npm run preview` - Preview production build
 
+## Workflow Rule
+When the user asks for a "new task", always:
+1. Switch to `main`
+2. Pull latest changes from remote
+3. Clear context before continuing
+
 ## UI/UX Guidelines
 - Clean, minimal interface without clutter
 - Green color (#8bc34a) for workout indicators

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import { validateSpreadsheetSchema, formatValidationErrors } from '../utils/schemaValidator';
 
 // We access gapi via the window object, as it's loaded from a script tag.
@@ -15,16 +15,8 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
   const [loadingSheetData, setLoadingSheetData] = useState(false);
   const [loadingWorkoutDay, setLoadingWorkoutDay] = useState(false);
   const [hasLoadedInitialDayData, setHasLoadedInitialDayData] = useState(false);
-  const [perfTimings, setPerfTimings] = useState({
-    sheetSetupMs: null,
-    dayLoadMs: null,
-    totalInitialMs: null,
-    lastDateKey: null,
-    lastRowCount: 0
-  });
   const [editingSectionScores, setEditingSectionScores] = useState({}); // Track which section scores are being edited
   const [savingSectionScores, setSavingSectionScores] = useState({}); // Track which section scores are being saved
-  const initialLoadStartRef = useRef(null);
 
   const parseLocalDateString = (value) => {
     if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
@@ -219,16 +211,8 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
       setWorkoutHeaders([]);
       setWorkoutDateRowsMap({});
       setHasLoadedInitialDayData(false);
-      initialLoadStartRef.current = performance.now();
-      setPerfTimings(prev => ({
-        ...prev,
-        sheetSetupMs: null,
-        dayLoadMs: null,
-        totalInitialMs: null
-      }));
 
       try {
-        const phaseStart = performance.now();
         await ensureSheetsApiReady();
 
         // Validate spreadsheet schema before loading tabs
@@ -322,10 +306,6 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
           setWorkoutHeaders(headers);
           setWorkoutDateRowsMap(dateRowsMap);
           setError(null);
-          setPerfTimings(prev => ({
-            ...prev,
-            sheetSetupMs: Math.round(performance.now() - phaseStart)
-          }));
         }
       } catch (err) {
         if (!cancelled) {
@@ -356,20 +336,12 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
 
       const selectedDateKey = toDateKey(selectedDate);
       const rowNumbers = workoutDateRowsMap[selectedDateKey] || [];
-      const phaseStart = performance.now();
 
       if (rowNumbers.length === 0) {
         setLoadingWorkoutDay(false);
         setWorkouts([]);
         setError(null);
         setHasLoadedInitialDayData(true);
-        setPerfTimings(prev => ({
-          ...prev,
-          dayLoadMs: Math.round(performance.now() - phaseStart),
-          totalInitialMs: prev.totalInitialMs ?? (initialLoadStartRef.current ? Math.round(performance.now() - initialLoadStartRef.current) : null),
-          lastDateKey: selectedDateKey,
-          lastRowCount: 0
-        }));
         return;
       }
 
@@ -406,13 +378,6 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
         if (!cancelled) {
           setWorkouts(formattedData);
           setHasLoadedInitialDayData(true);
-          setPerfTimings(prev => ({
-            ...prev,
-            dayLoadMs: Math.round(performance.now() - phaseStart),
-            totalInitialMs: prev.totalInitialMs ?? (initialLoadStartRef.current ? Math.round(performance.now() - initialLoadStartRef.current) : null),
-            lastDateKey: selectedDateKey,
-            lastRowCount: rowNumbers.length
-          }));
         }
       } catch (err) {
         if (!cancelled) {
@@ -576,20 +541,6 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
 
   return (
     <div>
-      <div style={{
-        marginBottom: '12px',
-        padding: '8px 10px',
-        border: '1px solid #333',
-        borderRadius: '6px',
-        backgroundColor: '#1a1a1a',
-        color: '#999',
-        fontSize: '0.8em'
-      }}>
-        <strong style={{ color: '#bbb' }}>Perf</strong>{' '}
-        setup: {perfTimings.sheetSetupMs ?? '...'}ms · day: {perfTimings.dayLoadMs ?? '...'}ms
-        {perfTimings.totalInitialMs !== null ? ` · initial: ${perfTimings.totalInitialMs}ms` : ''}
-        {perfTimings.lastDateKey ? ` · ${perfTimings.lastDateKey} (${perfTimings.lastRowCount} rows)` : ''}
-      </div>
       {showInlineDayLoading && (
         <div class="loading-inline" role="status" aria-live="polite">
           <div class="loading-spinner" aria-hidden="true" />

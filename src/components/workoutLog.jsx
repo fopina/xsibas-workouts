@@ -8,9 +8,13 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
   const [workouts, setWorkouts] = useState([]);
   const [exerciseVideoMap, setExerciseVideoMap] = useState({});
   const [exerciseDetailsMap, setExerciseDetailsMap] = useState({});
+  const [workoutHeaders, setWorkoutHeaders] = useState([]);
+  const [workoutDateRowsMap, setWorkoutDateRowsMap] = useState({});
   const [expandedVideos, setExpandedVideos] = useState({});
   const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loadingSheetData, setLoadingSheetData] = useState(false);
+  const [loadingWorkoutDay, setLoadingWorkoutDay] = useState(false);
+  const [hasLoadedInitialDayData, setHasLoadedInitialDayData] = useState(false);
   const [editingSectionScores, setEditingSectionScores] = useState({}); // Track which section scores are being edited
   const [savingSectionScores, setSavingSectionScores] = useState({}); // Track which section scores are being saved
 
@@ -26,6 +30,71 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  };
+
+  const columnIndexToLetter = (index) => {
+    let result = '';
+    let current = index;
+    while (current >= 0) {
+      result = String.fromCharCode((current % 26) + 65) + result;
+      current = Math.floor(current / 26) - 1;
+    }
+    return result;
+  };
+
+  const ensureSheetsApiReady = async () => {
+    const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
+
+    if (!accessToken && (!apiKey || apiKey === 'YOUR_API_KEY_HERE')) {
+      throw new Error('Please log in to view your workout plan.');
+    }
+
+    await new Promise((resolve) => {
+      const interval = setInterval(() => {
+        if (gapi && gapi.client) {
+          clearInterval(interval);
+          resolve();
+        }
+      }, 100);
+    });
+
+    if (accessToken) {
+      gapi.client.setToken({ access_token: accessToken });
+    } else {
+      gapi.client.setApiKey(apiKey);
+    }
+
+    try {
+      await gapi.client.load('https://sheets.googleapis.com/$discovery/rest?version=v4');
+    } catch (err) {
+      throw new Error('The Google Sheets API is being blocked. Please check your browser extensions and network settings');
+    }
+
+    if (!gapi.client.sheets) {
+      throw new Error('The Google Sheets API is not available. Please check your browser extensions.');
+    }
+  };
+
+  const handleSheetFetchError = (err) => {
+    console.error('Error fetching sheet data:', err);
+    const errorMessage = err.result?.error?.message || err.message || '';
+    const errorStatus = err.result?.error?.status || err.status || '';
+    const errorCode = err.result?.error?.code || err.code || 0;
+
+    if ((errorStatus === 'PERMISSION_DENIED' || errorCode === 403) && !accessToken) {
+      setError('This sheet is private. Please log in to view it.');
+      if (onAuthRequired) onAuthRequired();
+    } else if (errorMessage === 'Please log in to view your workout plan.') {
+      setError('Please log in to view your workout plan.');
+    } else if (errorStatus === 'UNAUTHENTICATED' || errorMessage.includes('Invalid Credentials') || errorMessage.includes('invalid authentication')) {
+      setError('Login expired. Login again');
+      if (onSessionExpired) onSessionExpired();
+      if (onAuthRequired) onAuthRequired();
+    } else if ((errorStatus === 'PERMISSION_DENIED' || errorCode === 403) && accessToken) {
+      setError(`You don't have permission to access this sheet. Make sure it's shared with your Google account.`);
+    } else {
+      setError(`Error fetching workout data: ${errorMessage}`);
+    }
   };
 
   // Initialize selected date from URL or default to today
@@ -126,88 +195,75 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
   };
 
   useEffect(() => {
-    const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
+    let cancelled = false;
 
-    // Need either OAuth token or API key to proceed
-    if (!accessToken && (!apiKey || apiKey === 'YOUR_API_KEY_HERE')) {
-      setError('Please log in to view your workout plan.');
-      return;
-    }
+    const fetchSheetMetadataAndDateIndex = async () => {
+      if (!sheetId) {
+        setWorkouts([]);
+        setWorkoutHeaders([]);
+        setWorkoutDateRowsMap({});
+        return;
+      }
 
-    const fetchSheetData = async () => {
-      setLoading(true);
+      setLoadingSheetData(true);
       setError(null);
+      setWorkouts([]);
+      setWorkoutHeaders([]);
+      setWorkoutDateRowsMap({});
+      setHasLoadedInitialDayData(false);
+
       try {
-        // Wait for gapi.client to be initialized
-        await new Promise((resolve) => {
-          const interval = setInterval(() => {
-            if (gapi && gapi.client) {
-              clearInterval(interval);
-              resolve();
-            }
-          }, 100);
-        });
+        await ensureSheetsApiReady();
 
-        // 1. Configure authentication - use OAuth token if available, otherwise API key
-        if (accessToken) {
-          gapi.client.setToken({ access_token: accessToken });
-        } else if (apiKey) {
-          gapi.client.setApiKey(apiKey);
-        }
-
-        // 2. Load the Sheets API discovery document
-        try {
-          await gapi.client.load('https://sheets.googleapis.com/$discovery/rest?version=v4');
-        } catch (err) {
-            setError('The Google Sheets API is being blocked. Please check your browser extensions and network settings');
-            setLoading(false);
-            return;
-        }
-
-        if (!gapi.client.sheets) {
-          setError('The Google Sheets API is not available. Please check your browser extensions.');
-          setLoading(false);
+        // Validate spreadsheet schema before loading tabs
+        const validation = await validateSpreadsheetSchema(gapi, sheetId);
+        if (!validation.valid) {
+          if (!cancelled) {
+            setError(formatValidationErrors(validation.errors));
+          }
           return;
         }
 
-        // 2.5. Validate spreadsheet schema
-        try {
-          const validation = await validateSpreadsheetSchema(gapi, sheetId);
-          if (!validation.valid) {
-            setError(formatValidationErrors(validation.errors));
-            setLoading(false);
-            return;
-          }
-        } catch (err) {
-          // Let auth/permission errors from validation bubble up to main error handler
-          throw err;
+        const headers = validation.sheetHeaders?.WorkoutLog || [];
+        const dateColumnIndex = headers.indexOf('Date');
+        if (dateColumnIndex === -1) {
+          throw new Error('WorkoutLog sheet is missing a Date column.');
         }
 
-        // 3. Fetch spreadsheet metadata to get title
-        try {
-          const metadataResponse = await gapi.client.sheets.spreadsheets.get({
+        const dateColumnLetter = columnIndexToLetter(dateColumnIndex);
+        const metadataPromise = (async () => {
+          try {
+            return await gapi.client.sheets.spreadsheets.get({
+              spreadsheetId: sheetId,
+              fields: 'properties.title'
+            });
+          } catch (err) {
+            console.warn('Could not fetch sheet title:', err);
+            return null;
+          }
+        })();
+
+        const [metadataResponse, exercisesResponse, datesResponse] = await Promise.all([
+          metadataPromise,
+          gapi.client.sheets.spreadsheets.values.get({
             spreadsheetId: sheetId,
-            fields: 'properties.title'
-          });
-          const sheetTitle = metadataResponse.result.properties?.title;
-          if (sheetTitle && onSheetTitleLoaded) {
-            onSheetTitleLoaded(sheetId, sheetTitle);
-          }
-        } catch (err) {
-          console.warn('Could not fetch sheet title:', err);
-        }
+            range: 'Exercises!A:Z',
+          }),
+          gapi.client.sheets.spreadsheets.values.get({
+            spreadsheetId: sheetId,
+            range: `WorkoutLog!${dateColumnLetter}2:${dateColumnLetter}`,
+          })
+        ]);
 
-        // 5. Fetch Exercises tab to get video and extra metadata per exercise
-        const exercisesResponse = await gapi.client.sheets.spreadsheets.values.get({
-          spreadsheetId: sheetId,
-          range: 'Exercises!A:Z',
-        });
+        const sheetTitle = metadataResponse?.result?.properties?.title;
+        if (!cancelled && sheetTitle && onSheetTitleLoaded) {
+          onSheetTitleLoaded(sheetId, sheetTitle);
+        }
 
         const exercisesData = exercisesResponse.result.values;
         const videoMap = {};
         const detailsMap = {};
         if (exercisesData && exercisesData.length > 1) {
-          // Assuming row 0 is headers, find the relevant columns
           const exerciseHeaders = exercisesData[0];
           const exerciseNameIndex = exerciseHeaders.indexOf('Exercise');
           const videoLinkIndex = exerciseHeaders.indexOf('VideoLink');
@@ -232,71 +288,125 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
             });
           }
         }
-        setExerciseVideoMap(videoMap);
-        setExerciseDetailsMap(detailsMap);
 
-        // 6. Fetch WorkoutLog data
-        const workoutResponse = await gapi.client.sheets.spreadsheets.values.get({
-          spreadsheetId: sheetId,
-          range: 'WorkoutLog!A:Z',
+        const dateRowsMap = {};
+        (datesResponse.result.values || []).forEach((row, index) => {
+          const dateValue = row[0];
+          if (!parseLocalDateString(dateValue)) return;
+          const sheetRowNumber = index + 2;
+          if (!dateRowsMap[dateValue]) {
+            dateRowsMap[dateValue] = [];
+          }
+          dateRowsMap[dateValue].push(sheetRowNumber);
         });
 
-        const data = workoutResponse.result.values;
-        if (data && data.length > 0) {
-          const headers = data[0];
-          const formattedData = data.slice(1).map(row => {
-            const workout = {};
-            headers.forEach((header, index) => {
-              workout[header] = row[index] || ''; // Ensure empty cells are handled
-            });
-            // Ensure every workout has expected optional fields even if columns don't exist
-            if (!('Notes' in workout)) {
-              workout.Notes = '';
-            }
-            if (!('Section Score' in workout)) {
-              workout['Section Score'] = '';
-            }
-            return workout;
-          });
-          setWorkouts(formattedData);
-        } else {
-          setError('No data found in sheet.');
+        if (!cancelled) {
+          setExerciseVideoMap(videoMap);
+          setExerciseDetailsMap(detailsMap);
+          setWorkoutHeaders(headers);
+          setWorkoutDateRowsMap(dateRowsMap);
+          setError(null);
         }
       } catch (err) {
-        console.error("Error fetching sheet data:", err);
-        const errorMessage = err.result?.error?.message || err.message || '';
-        const errorStatus = err.result?.error?.status || err.status || '';
-        const errorCode = err.result?.error?.code || err.code || 0;
-
-        // Check for permission errors when in anonymous mode
-        if ((errorStatus === 'PERMISSION_DENIED' || errorCode === 403) && !accessToken) {
-          setError('This sheet is private. Please log in to view it.');
-          if (onAuthRequired) onAuthRequired();
-        }
-        // Check for authentication errors with token
-        else if (errorStatus === 'UNAUTHENTICATED' || errorMessage.includes('Invalid Credentials') || errorMessage.includes('invalid authentication')) {
-          setError('Login expired. Login again');
-          if (onSessionExpired) onSessionExpired();
-          if (onAuthRequired) onAuthRequired();
-        }
-        // Check for permission errors when authenticated
-        else if ((errorStatus === 'PERMISSION_DENIED' || errorCode === 403) && accessToken) {
-          setError(`You don't have permission to access this sheet. Make sure it's shared with your Google account.`);
-        }
-        else {
-          setError(`Error fetching workout data: ${errorMessage}`);
+        if (!cancelled) {
+          handleSheetFetchError(err);
         }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoadingSheetData(false);
+        }
       }
     };
 
-    fetchSheetData();
+    fetchSheetMetadataAndDateIndex();
 
-  }, [accessToken, sheetId]); // This effect runs when accessToken or sheetId changes
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, sheetId]);
 
-  if (loading) {
-    return <p>Loading workout data...</p>;
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchSelectedDayWorkouts = async () => {
+      if (!sheetId || workoutHeaders.length === 0) {
+        setLoadingWorkoutDay(false);
+        return;
+      }
+
+      const selectedDateKey = toDateKey(selectedDate);
+      const rowNumbers = workoutDateRowsMap[selectedDateKey] || [];
+
+      if (rowNumbers.length === 0) {
+        setLoadingWorkoutDay(false);
+        setWorkouts([]);
+        setError(null);
+        setHasLoadedInitialDayData(true);
+        return;
+      }
+
+      setLoadingWorkoutDay(true);
+      setError(null);
+
+      try {
+        await ensureSheetsApiReady();
+
+        const ranges = rowNumbers.map((rowNumber) => `WorkoutLog!A${rowNumber}:Z${rowNumber}`);
+        const response = await gapi.client.sheets.spreadsheets.values.batchGet({
+          spreadsheetId: sheetId,
+          ranges,
+        });
+
+        const formattedData = (response.result.valueRanges || []).map((rangeResult, index) => {
+          const row = rangeResult.values?.[0] || [];
+          const workout = { __sheetRowNumber: rowNumbers[index] };
+
+          workoutHeaders.forEach((header, headerIndex) => {
+            workout[header] = row[headerIndex] || '';
+          });
+
+          if (!('Notes' in workout)) {
+            workout.Notes = '';
+          }
+          if (!('Section Score' in workout)) {
+            workout['Section Score'] = '';
+          }
+
+          return workout;
+        });
+
+        if (!cancelled) {
+          setWorkouts(formattedData);
+          setHasLoadedInitialDayData(true);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          handleSheetFetchError(err);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingWorkoutDay(false);
+        }
+      }
+    };
+
+    fetchSelectedDayWorkouts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, sheetId, selectedDate, workoutHeaders, workoutDateRowsMap]);
+
+  const showFullLoading = loadingSheetData || (loadingWorkoutDay && !hasLoadedInitialDayData);
+  const showInlineDayLoading = loadingWorkoutDay && hasLoadedInitialDayData;
+
+  if (showFullLoading) {
+    return (
+      <div class="loading-state">
+        <div class="loading-spinner large" aria-hidden="true" />
+        <div>Loading workout data...</div>
+      </div>
+    );
   }
 
   if (error) {
@@ -327,7 +437,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
   // Helper function to check if a date has workouts
   const hasWorkout = (date) => {
     const dateStr = toDateKey(date);
-    return workouts.some(workout => workout.Date === dateStr);
+    return Boolean(workoutDateRowsMap[dateStr]?.length);
   };
 
   // Helper function to get workouts for a specific date
@@ -354,7 +464,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
   };
 
   // Function to update section score in the spreadsheet
-  const updateSectionScore = async (rowIndex, newSectionScore, exerciseKey) => {
+  const updateSectionScore = async (sheetRowNumber, newSectionScore, exerciseKey) => {
     if (!accessToken) {
       alert('Please sign in to edit section score');
       if (onAuthRequired) onAuthRequired();
@@ -389,8 +499,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
 
       // Convert column index to letter (A, B, C, ...)
       const columnLetter = String.fromCharCode(65 + sectionScoreColumnIndex);
-      // Row index in sheet is rowIndex + 2 (1 for header, 1 for 0-based to 1-based)
-      const cellRange = `WorkoutLog!${columnLetter}${rowIndex + 2}`;
+      const cellRange = `WorkoutLog!${columnLetter}${sheetRowNumber}`;
 
       // Update the section score cell
       await gapi.client.sheets.spreadsheets.values.update({
@@ -404,9 +513,11 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
 
       // Update local state
       setWorkouts(prev => {
-        const updated = [...prev];
-        updated[rowIndex] = { ...updated[rowIndex], ['Section Score']: newSectionScore };
-        return updated;
+        return prev.map(workout =>
+          workout.__sheetRowNumber === sheetRowNumber
+            ? { ...workout, ['Section Score']: newSectionScore }
+            : workout
+        );
       });
 
       // Clear editing state
@@ -430,6 +541,12 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
 
   return (
     <div>
+      {showInlineDayLoading && (
+        <div class="loading-inline" role="status" aria-live="polite">
+          <div class="loading-spinner" aria-hidden="true" />
+          <span>Loading day...</span>
+        </div>
+      )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h2>Workout</h2>
         <div style={{ display: 'flex', gap: '8px' }}>
@@ -566,12 +683,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                           const isSavingSectionScore = exerciseKey in savingSectionScores;
                           const canEditSectionScore = !!accessToken;
 
-                          // Find the row index in the original workouts array for this exercise
-                          const rowIndex = workouts.findIndex(w =>
-                            w.Date === exercise.Date &&
-                            w.Exercise === exercise.Exercise &&
-                            w.Section === exercise.Section
-                          );
+                          const sheetRowNumber = exercise.__sheetRowNumber;
 
                           return (
                             <div key={exerciseIndex} style={{
@@ -584,6 +696,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                               {Object.entries(exercise).map(([key, value]) => {
                                 // Skip Date, Section, Section Prescription, Day, and Section Score as they're already shown
                                 // Don't skip empty Notes field - we want to show it for editing
+                                if (key.startsWith('__')) return null;
                                 if (key === 'Date' || key === 'Section' || key === 'Section Prescription' || key === 'Day') return null;
                                 if (key === 'Section Score') return null;
                                 if (!value && key !== 'Notes') return null;
@@ -741,7 +854,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                                           />
                                           <div style={{ marginTop: '5px', display: 'flex', gap: '5px' }}>
                                             <button
-                                              onClick={() => updateSectionScore(rowIndex, editingSectionScores[exerciseKey] || '', exerciseKey)}
+                                              onClick={() => updateSectionScore(sheetRowNumber, editingSectionScores[exerciseKey] || '', exerciseKey)}
                                               disabled={isSavingSectionScore}
                                               style={{
                                                 padding: '5px 10px',

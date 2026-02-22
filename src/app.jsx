@@ -819,7 +819,10 @@ export function App() {
             }}
           />
         ) : (
-          <p>Loading Google API client...</p>
+          <div class="loading-state">
+            <div class="loading-spinner large" aria-hidden="true" />
+            <div>Loading Google API client...</div>
+          </div>
         )}
       </main>
       <footer style={{

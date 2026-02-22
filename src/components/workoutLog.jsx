@@ -4,7 +4,7 @@ import { validateSpreadsheetSchema, formatValidationErrors } from '../utils/sche
 // We access gapi via the window object, as it's loaded from a script tag.
 const gapi = window.gapi;
 
-const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, onSessionExpired }) => {
+const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, onSessionExpired, onAuthRefreshRequested }) => {
   const [workouts, setWorkouts] = useState([]);
   const [exerciseVideoMap, setExerciseVideoMap] = useState({});
   const [exerciseDetailsMap, setExerciseDetailsMap] = useState({});
@@ -47,10 +47,10 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
     return result;
   };
 
-  const ensureSheetsApiReady = async () => {
+  const ensureSheetsApiReady = async (tokenOverride = accessToken) => {
     const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
 
-    if (!accessToken && (!apiKey || apiKey === 'YOUR_API_KEY_HERE')) {
+    if (!tokenOverride && (!apiKey || apiKey === 'YOUR_API_KEY_HERE')) {
       throw new Error('Please log in to view your workout plan.');
     }
 
@@ -63,8 +63,8 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
       }, 100);
     });
 
-    if (accessToken) {
-      gapi.client.setToken({ access_token: accessToken });
+    if (tokenOverride) {
+      gapi.client.setToken({ access_token: tokenOverride });
     } else {
       gapi.client.setApiKey(apiKey);
     }
@@ -99,6 +99,56 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
       setError(`You don't have permission to access this sheet. Make sure it's shared with your Google account.`);
     } else {
       setError(`Error fetching workout data: ${errorMessage}`);
+    }
+  };
+
+  const isUnauthenticatedApiError = (err) => {
+    const errorMessage = err?.result?.error?.message || err?.message || '';
+    const errorStatus = err?.result?.error?.status || err?.status || '';
+    return errorStatus === 'UNAUTHENTICATED' ||
+      errorMessage.includes('Invalid Credentials') ||
+      errorMessage.includes('invalid authentication');
+  };
+
+  const trySilentRefreshAfterAuthError = async (err, context) => {
+    const errorMessage = err?.result?.error?.message || err?.message || '';
+    const errorStatus = err?.result?.error?.status || err?.status || '';
+    const errorCode = err?.result?.error?.code || err?.code || '';
+
+    if (!accessToken || !onAuthRefreshRequested) {
+      console.warn('[WorkoutLog] Auth error refresh path unavailable', {
+        context,
+        hasAccessToken: !!accessToken,
+        hasRefreshHandler: !!onAuthRefreshRequested,
+        errorStatus,
+        errorCode,
+        errorMessage
+      });
+      return null;
+    }
+    if (!isUnauthenticatedApiError(err)) return null;
+
+    console.warn('[WorkoutLog] Access token failed for Sheets API call, attempting silent refresh', {
+      context,
+      errorStatus,
+      errorCode,
+      errorMessage
+    });
+
+    try {
+      const refreshedToken = await onAuthRefreshRequested();
+      if (refreshedToken) {
+        console.info('[WorkoutLog] Silent refresh returned a new access token', { context });
+        return refreshedToken;
+      }
+      console.warn('[WorkoutLog] Silent refresh returned no token', { context });
+      return null;
+    } catch (refreshErr) {
+      console.error('[WorkoutLog] Silent refresh request failed', {
+        context,
+        error: refreshErr?.message || refreshErr
+      });
+      return null;
     }
   };
 
@@ -202,7 +252,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
   useEffect(() => {
     let cancelled = false;
 
-    const fetchSheetMetadataAndDateIndex = async () => {
+    const fetchSheetMetadataAndDateIndex = async (retryToken = null, hasRetried = false) => {
       const setupStartMs = nowMs();
       if (!sheetId) {
         setWorkouts([]);
@@ -219,7 +269,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
       setHasLoadedInitialDayData(false);
 
       try {
-        await ensureSheetsApiReady();
+        await ensureSheetsApiReady(retryToken);
 
         // Validate spreadsheet schema before loading tabs
         const validation = await validateSpreadsheetSchema(gapi, sheetId);
@@ -323,6 +373,12 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
           sheetId,
           error: err?.message || err
         });
+        const refreshedToken = !hasRetried
+          ? await trySilentRefreshAfterAuthError(err, 'setup')
+          : null;
+        if (refreshedToken) {
+          return fetchSheetMetadataAndDateIndex(refreshedToken, true);
+        }
         if (!cancelled) {
           handleSheetFetchError(err);
         }
@@ -343,7 +399,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
   useEffect(() => {
     let cancelled = false;
 
-    const fetchSelectedDayWorkouts = async () => {
+    const fetchSelectedDayWorkouts = async (retryToken = null, hasRetried = false) => {
       const dayLoadStartMs = nowMs();
       if (!sheetId || workoutHeaders.length === 0) {
         setLoadingWorkoutDay(false);
@@ -371,7 +427,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
       setError(null);
 
       try {
-        await ensureSheetsApiReady();
+        await ensureSheetsApiReady(retryToken);
 
         const ranges = rowNumbers.map((rowNumber) => `WorkoutLog!A${rowNumber}:Z${rowNumber}`);
         const response = await gapi.client.sheets.spreadsheets.values.batchGet({
@@ -413,6 +469,12 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
           date: selectedDateKey,
           error: err?.message || err
         });
+        const refreshedToken = !hasRetried
+          ? await trySilentRefreshAfterAuthError(err, 'day_load')
+          : null;
+        if (refreshedToken) {
+          return fetchSelectedDayWorkouts(refreshedToken, true);
+        }
         if (!cancelled) {
           handleSheetFetchError(err);
         }

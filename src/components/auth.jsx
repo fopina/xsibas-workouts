@@ -1,19 +1,98 @@
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 
 const STORAGE_KEY = 'google_access_token';
 const USER_NAME_KEY = 'google_user_name';
 
-const Auth = ({ onAuthChange, forceLogoutVersion = 0 }) => {
+const Auth = ({ onAuthChange, onAuthApiReady, forceLogoutVersion = 0 }) => {
   const [tokenClient, setTokenClient] = useState(null);
   const [accessToken, setAccessToken] = useState(null);
   const [userName, setUserName] = useState(null);
 
+  const pendingTokenRequestRef = useRef(null);
+  const refreshInFlightRef = useRef(null);
+
   const clearAuthState = () => {
+    pendingTokenRequestRef.current = null;
+    refreshInFlightRef.current = null;
     setAccessToken(null);
     setUserName(null);
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(USER_NAME_KEY);
     onAuthChange(null);
+  };
+
+  const persistTokenState = (tokenResponse) => {
+    if (!tokenResponse?.access_token) return;
+
+    setAccessToken(tokenResponse.access_token);
+    localStorage.setItem(STORAGE_KEY, tokenResponse.access_token);
+    onAuthChange(tokenResponse.access_token);
+  };
+
+  const requestAccessTokenWithMode = (mode) => {
+    if (!tokenClient) {
+      return Promise.reject(new Error('Token client not initialized'));
+    }
+
+    if (pendingTokenRequestRef.current) {
+      return Promise.reject(new Error('Another token request is already pending'));
+    }
+
+    return new Promise((resolve, reject) => {
+      pendingTokenRequestRef.current = { mode, resolve, reject };
+      try {
+        if (mode === 'silent') {
+          console.log('[Auth] Starting silent token refresh');
+          tokenClient.requestAccessToken({ prompt: '' });
+        } else {
+          console.log('[Auth] Starting interactive token request');
+          tokenClient.requestAccessToken();
+        }
+      } catch (err) {
+        pendingTokenRequestRef.current = null;
+        reject(err);
+      }
+    });
+  };
+
+  const refreshAccessTokenSilently = async (reason = 'api_auth_error') => {
+    if (!accessToken || !tokenClient) return null;
+    if (refreshInFlightRef.current) {
+      console.log('[Auth] Silent refresh already in progress, joining:', reason);
+      return refreshInFlightRef.current;
+    }
+
+    if (pendingTokenRequestRef.current) {
+      console.log('[Auth] Token request already pending, skipping silent refresh:', reason);
+      return null;
+    }
+
+    const startedAt = Date.now();
+    console.log('[Auth] Silent refresh start:', { reason });
+
+    refreshInFlightRef.current = requestAccessTokenWithMode('silent')
+      .then((tokenResponse) => {
+        console.log('[Auth] Silent refresh success', {
+          reason,
+          durationMs: Date.now() - startedAt
+        });
+        return tokenResponse?.access_token || null;
+      })
+      .catch((err) => {
+        console.error('[Auth] Silent refresh failed', {
+          reason,
+          durationMs: Date.now() - startedAt,
+          error: err?.message || err
+        });
+        // Transition to explicit re-auth state if silent refresh fails.
+        clearAuthState();
+        return null;
+      })
+      .finally(() => {
+        refreshInFlightRef.current = null;
+      });
+
+    return refreshInFlightRef.current;
   };
 
   // Restore token and user name from localStorage on mount
@@ -40,12 +119,18 @@ const Auth = ({ onAuthChange, forceLogoutVersion = 0 }) => {
           scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile',
           callback: async (tokenResponse) => {
             console.log('Token response received:', tokenResponse);
-            if (tokenResponse && tokenResponse.access_token) {
-              setAccessToken(tokenResponse.access_token);
-              localStorage.setItem(STORAGE_KEY, tokenResponse.access_token);
-              onAuthChange(tokenResponse.access_token);
+            const pendingRequest = pendingTokenRequestRef.current;
+            pendingTokenRequestRef.current = null;
 
-              // Fetch user info to get the name
+            if (tokenResponse?.error) {
+              pendingRequest?.reject?.(new Error(tokenResponse.error));
+              return;
+            }
+
+            if (tokenResponse && tokenResponse.access_token) {
+              persistTokenState(tokenResponse);
+
+              // Fetch user info to get the name (best effort)
               try {
                 const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
                   headers: {
@@ -60,6 +145,8 @@ const Auth = ({ onAuthChange, forceLogoutVersion = 0 }) => {
               } catch (err) {
                 console.error('Error fetching user info:', err);
               }
+
+              pendingRequest?.resolve?.(tokenResponse);
             }
           },
         });
@@ -80,14 +167,24 @@ const Auth = ({ onAuthChange, forceLogoutVersion = 0 }) => {
     return () => clearInterval(checkGisReady);
   }, [onAuthChange]);
 
+  useEffect(() => {
+    if (!onAuthApiReady) return;
+
+    onAuthApiReady({
+      refreshAccessTokenSilently,
+      clearAuthState
+    });
+
+    return () => onAuthApiReady(null);
+  }, [onAuthApiReady, accessToken, tokenClient]);
+
   const handleLogin = () => {
     console.log('Login button clicked');
     console.log('Token client available:', !!tokenClient);
     if (tokenClient) {
-      // Prompt the user to select a Google Account and ask for consent to share their data
-      // when establishing a new session.
-      console.log('Requesting access token...');
-      tokenClient.requestAccessToken();
+      requestAccessTokenWithMode('interactive').catch((err) => {
+        console.error('Interactive login failed:', err);
+      });
     } else {
       console.error('Token client not initialized');
     }

@@ -17,6 +17,11 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
   const [hasLoadedInitialDayData, setHasLoadedInitialDayData] = useState(false);
   const [editingSectionScores, setEditingSectionScores] = useState({}); // Track which section scores are being edited
   const [savingSectionScores, setSavingSectionScores] = useState({}); // Track which section scores are being saved
+  const nowMs = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  const logPerf = (phase, startMs, details = {}) => {
+    const durationMs = Math.round(nowMs() - startMs);
+    console.info(`[WorkoutLog][Perf] ${phase}: ${durationMs}ms`, details);
+  };
 
   const parseLocalDateString = (value) => {
     if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
@@ -198,6 +203,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
     let cancelled = false;
 
     const fetchSheetMetadataAndDateIndex = async () => {
+      const setupStartMs = nowMs();
       if (!sheetId) {
         setWorkouts([]);
         setWorkoutHeaders([]);
@@ -306,8 +312,17 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
           setWorkoutHeaders(headers);
           setWorkoutDateRowsMap(dateRowsMap);
           setError(null);
+          logPerf('setup', setupStartMs, {
+            sheetId,
+            distinctWorkoutDates: Object.keys(dateRowsMap).length,
+            exercisesIndexed: Object.keys(detailsMap).length
+          });
         }
       } catch (err) {
+        logPerf('setup_failed', setupStartMs, {
+          sheetId,
+          error: err?.message || err
+        });
         if (!cancelled) {
           handleSheetFetchError(err);
         }
@@ -329,6 +344,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
     let cancelled = false;
 
     const fetchSelectedDayWorkouts = async () => {
+      const dayLoadStartMs = nowMs();
       if (!sheetId || workoutHeaders.length === 0) {
         setLoadingWorkoutDay(false);
         return;
@@ -336,12 +352,18 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
 
       const selectedDateKey = toDateKey(selectedDate);
       const rowNumbers = workoutDateRowsMap[selectedDateKey] || [];
+      const loadKind = hasLoadedInitialDayData ? 'day_switch' : 'initial_day';
 
       if (rowNumbers.length === 0) {
         setLoadingWorkoutDay(false);
         setWorkouts([]);
         setError(null);
         setHasLoadedInitialDayData(true);
+        logPerf(loadKind, dayLoadStartMs, {
+          sheetId,
+          date: selectedDateKey,
+          rows: 0
+        });
         return;
       }
 
@@ -378,8 +400,19 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
         if (!cancelled) {
           setWorkouts(formattedData);
           setHasLoadedInitialDayData(true);
+          logPerf(loadKind, dayLoadStartMs, {
+            sheetId,
+            date: selectedDateKey,
+            rowsRequested: rowNumbers.length,
+            rowsLoaded: formattedData.length
+          });
         }
       } catch (err) {
+        logPerf(`${loadKind}_failed`, dayLoadStartMs, {
+          sheetId,
+          date: selectedDateKey,
+          error: err?.message || err
+        });
         if (!cancelled) {
           handleSheetFetchError(err);
         }
@@ -397,8 +430,13 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
     };
   }, [accessToken, sheetId, selectedDate, workoutHeaders, workoutDateRowsMap]);
 
-  const showFullLoading = loadingSheetData || (loadingWorkoutDay && !hasLoadedInitialDayData);
-  const showInlineDayLoading = loadingWorkoutDay && hasLoadedInitialDayData;
+  const showFullLoading = loadingSheetData;
+  const showInlineDayLoading = (
+    !loadingSheetData &&
+    !error &&
+    workoutHeaders.length > 0 &&
+    !hasLoadedInitialDayData
+  ) || (loadingWorkoutDay && hasLoadedInitialDayData);
 
   if (showFullLoading) {
     return (
@@ -541,12 +579,6 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
 
   return (
     <div>
-      {showInlineDayLoading && (
-        <div class="loading-inline" role="status" aria-live="polite">
-          <div class="loading-spinner" aria-hidden="true" />
-          <span>Loading day...</span>
-        </div>
-      )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h2>Workout</h2>
         <div style={{ display: 'flex', gap: '8px' }}>
@@ -628,7 +660,12 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
 
           {/* Show workout details for selected date */}
           <div>
-            {getWorkoutsForDate(selectedDate).length > 0 ? (
+            {showInlineDayLoading ? (
+              <div class="loading-inline" role="status" aria-live="polite">
+                <div class="loading-spinner" aria-hidden="true" />
+                <span>Loading day...</span>
+              </div>
+            ) : getWorkoutsForDate(selectedDate).length > 0 ? (
               <div>
                 <h3>Workouts for {formatDate(selectedDate)}</h3>
                 {(() => {

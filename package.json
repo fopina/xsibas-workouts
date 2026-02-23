@@ -14,7 +14,8 @@
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
     "test:integration": "vitest run --config vitest.integration.config.js",
-    "test:integration:env": "set -a && . ./.env.test && set +a && npm run test:integration"
+    "test:integration:env": "set -a && . ./.env.test && set +a && npm run test:integration",
+    "test:cli": "node scripts/google-dev-cli.mjs"
   },
   "dependencies": {
     "preact": "^10.27.2"

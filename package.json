@@ -13,7 +13,8 @@
     "test:watch": "vitest watch",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
-    "test:integration": "vitest run --config vitest.integration.config.js"
+    "test:integration": "vitest run --config vitest.integration.config.js",
+    "test:integration:env": "set -a && . ./.env.test && set +a && npm run test:integration"
   },
   "dependencies": {
     "preact": "^10.27.2"
@@ -22,6 +23,7 @@
     "@preact/preset-vite": "^2.10.2",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/preact": "^3.2.4",
+    "@vitest/coverage-v8": "^4.0.18",
     "@vitest/ui": "^4.0.18",
     "googleapis": "^171.4.0",
     "happy-dom": "^20.6.0",

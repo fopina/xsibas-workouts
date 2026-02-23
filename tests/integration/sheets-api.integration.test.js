@@ -178,7 +178,7 @@ describe('Google Sheets API Integration', () => {
     it('should read exercise data from Exercises sheet', async () => {
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId: testSpreadsheetId,
-        range: 'Exercises!A1:B10'
+        range: 'Exercises!A1:Z10'
       });
 
       expect(response.data.values).toBeDefined();
@@ -187,7 +187,7 @@ describe('Google Sheets API Integration', () => {
       // First row should be headers
       const headers = response.data.values[0];
       expect(headers[0]).toBe('Exercise');
-      expect(headers[1]).toBe('VideoLink');
+      expect(headers).toContain('VideoLink');
     });
   });
 

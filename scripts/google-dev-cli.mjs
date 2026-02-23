@@ -21,11 +21,13 @@ function printHelp() {
 
 Usage:
   node scripts/google-dev-cli.mjs login [--port 5173]
+  node scripts/google-dev-cli.mjs login-sa
   node scripts/google-dev-cli.mjs get <SHEET_ID> [--token <ACCESS_TOKEN>]
   node scripts/google-dev-cli.mjs logout [--token <ACCESS_TOKEN>]
 
 Commands:
   login   Open a localhost page in the browser and request an access token
+  login-sa Create an access token from service account credentials in .env.test
   get     Read spreadsheet metadata and print a workout summary
   logout  Revoke the current access token in Google OAuth
 
@@ -87,14 +89,16 @@ function parseDotEnv(content) {
   return out;
 }
 
-async function getEnvValue(key) {
+async function getEnvValue(key, files = ['.env']) {
   if (process.env[key]) return process.env[key];
-  try {
-    const envContent = await readFile('.env', 'utf8');
-    const parsed = parseDotEnv(envContent);
-    if (parsed[key]) return parsed[key];
-  } catch {
-    // Ignore missing .env
+  for (const file of files) {
+    try {
+      const envContent = await readFile(file, 'utf8');
+      const parsed = parseDotEnv(envContent);
+      if (parsed[key]) return parsed[key];
+    } catch {
+      // Ignore missing env files
+    }
   }
   return undefined;
 }
@@ -275,8 +279,41 @@ async function fetchUserInfo(accessToken) {
   }
 }
 
+async function fetchTokenInfo(accessToken) {
+  try {
+    return await fetchJson(`https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(accessToken)}`);
+  } catch {
+    return null;
+  }
+}
+
+async function describePrincipal(accessToken) {
+  const userInfo = await fetchUserInfo(accessToken);
+  if (userInfo?.email || userInfo?.name) {
+    return userInfo.email && userInfo.name
+      ? `${userInfo.name} <${userInfo.email}>`
+      : (userInfo.email || userInfo.name);
+  }
+
+  const tokenInfo = await fetchTokenInfo(accessToken);
+  if (tokenInfo?.email) {
+    return tokenInfo.email;
+  }
+
+  if (tokenInfo?.sub) {
+    return `subject:${tokenInfo.sub}`;
+  }
+
+  const serviceAccountEmail = await getEnvValue('GOOGLE_SERVICE_ACCOUNT_EMAIL', ['.env.test']);
+  if (serviceAccountEmail) {
+    return `${serviceAccountEmail} (service account)`;
+  }
+
+  return '(unknown principal)';
+}
+
 async function cmdLogin(flags) {
-  const clientId = await getEnvValue('VITE_GOOGLE_CLIENT_ID');
+  const clientId = await getEnvValue('VITE_GOOGLE_CLIENT_ID', ['.env']);
   if (!clientId) {
     throw new Error('VITE_GOOGLE_CLIENT_ID not found in environment or .env');
   }
@@ -392,6 +429,61 @@ async function cmdLogin(flags) {
   }
 }
 
+function normalizePrivateKey(input) {
+  if (!input) return input;
+
+  const maybePem = input.includes('BEGIN PRIVATE KEY') ? input : null;
+  if (maybePem) {
+    return maybePem.replaceAll('\\n', '\n');
+  }
+
+  try {
+    const decoded = Buffer.from(input, 'base64').toString('utf8');
+    if (decoded.includes('BEGIN PRIVATE KEY')) {
+      return decoded.replaceAll('\\n', '\n');
+    }
+  } catch {
+    // Fall through to raw input
+  }
+
+  return input.replaceAll('\\n', '\n');
+}
+
+async function cmdLoginSa() {
+  const serviceAccountEmail = await getEnvValue('GOOGLE_SERVICE_ACCOUNT_EMAIL', ['.env.test']);
+  const privateKeyRaw = await getEnvValue('GOOGLE_PRIVATE_KEY', ['.env.test']);
+
+  if (!serviceAccountEmail || !privateKeyRaw) {
+    throw new Error('Missing GOOGLE_SERVICE_ACCOUNT_EMAIL or GOOGLE_PRIVATE_KEY in environment/.env.test');
+  }
+
+  const privateKey = normalizePrivateKey(privateKeyRaw);
+  const auth = new google.auth.JWT({
+    email: serviceAccountEmail,
+    key: privateKey,
+    scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+  });
+
+  const tokenResponse = await auth.authorize();
+  const accessToken = tokenResponse.access_token;
+  if (!accessToken) {
+    throw new Error('Service account login did not return an access token');
+  }
+
+  console.log(`Service account: ${serviceAccountEmail}`);
+  if (tokenResponse.expiry_date) {
+    const expiryIso = new Date(tokenResponse.expiry_date).toISOString();
+    console.log(`Expires at: ${expiryIso}`);
+  }
+  console.log('Scope: https://www.googleapis.com/auth/spreadsheets.readonly');
+  console.log('');
+  console.log('Access token (not persisted):');
+  console.log(accessToken);
+  console.log('');
+  console.log('Copy/paste into your shell:');
+  console.log(`export GOOGLE_TOKEN='${accessToken.replaceAll("'", "'\\''")}'`);
+}
+
 function createSheetsClient(accessToken) {
   const auth = new google.auth.OAuth2();
   auth.setCredentials({ access_token: accessToken });
@@ -460,6 +552,7 @@ async function cmdGet(sheetId, flags) {
     throw new Error('Missing token. Set GOOGLE_TOKEN or pass --token <ACCESS_TOKEN>.');
   }
 
+  const principal = await describePrincipal(accessToken);
   const sheets = createSheetsClient(accessToken);
 
   const [metadata, batch] = await Promise.all([
@@ -483,6 +576,7 @@ async function cmdGet(sheetId, flags) {
   const summary = summarizeWorkoutLog(workoutRows, workoutHeaders);
   const sheetNames = (metadata.data.sheets || []).map((s) => s.properties?.title).filter(Boolean);
 
+  console.log(`Retrieved sheet as ${principal}`);
   console.log(`Spreadsheet: ${metadata.data.properties?.title || '(untitled)'}`);
   console.log(`ID: ${sheetId}`);
   console.log(`Sheets: ${sheetNames.join(', ') || '(none)'}`);
@@ -544,6 +638,11 @@ async function main() {
 
   if (command === 'get') {
     await cmdGet(positional[0], flags);
+    return;
+  }
+
+  if (command === 'login-sa') {
+    await cmdLoginSa();
     return;
   }
 

@@ -563,7 +563,7 @@ export function App() {
             <input
               type="text"
               value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
+              onInput={(e) => setInputValue(e.target.value)}
               placeholder="Sheet URL or ID"
               style={{
                 width: '100%',

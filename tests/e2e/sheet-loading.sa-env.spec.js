@@ -1,16 +1,30 @@
 import { test, expect } from '@playwright/test';
 import { existsSync } from 'node:fs';
 import dotenv from 'dotenv';
+import { mintServiceAccountAccessToken, GOOGLE_PICKER_SCOPES } from '../../scripts/google-auth-utils.mjs';
 
 if (existsSync('.env.test')) {
   dotenv.config({ path: '.env.test' });
 }
 
 test('loads a shared sheet using service-account token from env', async ({ page }) => {
-  const token = process.env.GOOGLE_TOKEN;
   const sheetId = process.env.TEST_SPREADSHEET_ID;
+  const hasServiceAccountCreds = Boolean(
+    process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY
+  );
 
-  test.skip(!token || !sheetId, 'Requires GOOGLE_TOKEN and TEST_SPREADSHEET_ID');
+  test.skip(
+    !sheetId || (!process.env.GOOGLE_TOKEN && !hasServiceAccountCreds),
+    'Requires TEST_SPREADSHEET_ID and either GOOGLE_TOKEN or service-account credentials in .env.test'
+  );
+
+  const token = process.env.GOOGLE_TOKEN || (
+    await mintServiceAccountAccessToken({
+      serviceAccountEmail: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      privateKeyRaw: process.env.GOOGLE_PRIVATE_KEY,
+      scopes: GOOGLE_PICKER_SCOPES,
+    })
+  ).accessToken;
 
   await page.addInitScript(({ token: accessToken }) => {
     localStorage.setItem('google_access_token', accessToken);

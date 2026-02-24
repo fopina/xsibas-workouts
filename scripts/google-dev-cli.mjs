@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import process from 'node:process';
 import { google } from 'googleapis';
+import { mintServiceAccountAccessToken } from './google-auth-utils.mjs';
 
 const DEFAULT_PORT = 5173;
 const LOGIN_PATH = '/__google_cli_login__';
@@ -650,26 +651,6 @@ async function cmdLogin(flags) {
   }
 }
 
-function normalizePrivateKey(input) {
-  if (!input) return input;
-
-  const maybePem = input.includes('BEGIN PRIVATE KEY') ? input : null;
-  if (maybePem) {
-    return maybePem.replaceAll('\\n', '\n');
-  }
-
-  try {
-    const decoded = Buffer.from(input, 'base64').toString('utf8');
-    if (decoded.includes('BEGIN PRIVATE KEY')) {
-      return decoded.replaceAll('\\n', '\n');
-    }
-  } catch {
-    // Fall through to raw input
-  }
-
-  return input.replaceAll('\\n', '\n');
-}
-
 async function cmdLoginSa() {
   const serviceAccountEmail = await getEnvValue('GOOGLE_SERVICE_ACCOUNT_EMAIL', ['.env.test']);
   const privateKeyRaw = await getEnvValue('GOOGLE_PRIVATE_KEY', ['.env.test']);
@@ -678,18 +659,11 @@ async function cmdLoginSa() {
     throw new Error('Missing GOOGLE_SERVICE_ACCOUNT_EMAIL or GOOGLE_PRIVATE_KEY in environment/.env.test');
   }
 
-  const privateKey = normalizePrivateKey(privateKeyRaw);
-  const auth = new google.auth.JWT({
-    email: serviceAccountEmail,
-    key: privateKey,
+  const { accessToken, tokenResponse } = await mintServiceAccountAccessToken({
+    serviceAccountEmail,
+    privateKeyRaw,
     scopes: PICKER_SCOPES,
   });
-
-  const tokenResponse = await auth.authorize();
-  const accessToken = tokenResponse.access_token;
-  if (!accessToken) {
-    throw new Error('Service account login did not return an access token');
-  }
 
   console.log(`Service account: ${serviceAccountEmail}`);
   if (tokenResponse.expiry_date) {

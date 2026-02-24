@@ -1,4 +1,4 @@
-name: Integration Tests
+name: Smoke Tests
 
 on:
   # Run on demand
@@ -53,13 +53,43 @@ jobs:
                     'Workflow: ' + context.workflow,
               labels: ['bug', 'integration-test']
             });
+    
+  e2e-test:
+    runs-on: ubuntu-latest
 
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          name: integration-test-results
-          path: |
-            test-results/
-            coverage/
-          retention-days: 7
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npx playwright install chromium
+
+      - name: Run e2e tests
+        env:
+          GOOGLE_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_EMAIL }}
+          GOOGLE_PRIVATE_KEY: ${{ secrets.GOOGLE_PRIVATE_KEY }}
+          TEST_SPREADSHEET_ID: ${{ inputs.spreadsheet_id || secrets.TEST_SPREADSHEET_ID }}
+        run: npm run test:e2e
+
+      - name: Notify on failure
+        if: failure() && github.event_name == 'schedule'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🔴 E2E Tests Failed - ' + new Date().toISOString().split('T')[0],
+              body: 'The scheduled e2e tests have failed. Please investigate.\n\n' +
+                    'Run: ' + context.runId + '\n' +
+                    'Workflow: ' + context.workflow,
+              labels: ['bug', 'integration-test']
+            });

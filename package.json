@@ -16,7 +16,6 @@
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
     "test:integration": "vitest run --config vitest.integration.config.js",
-    "test:integration:env": "set -a && . ./.env.test && set +a && npm run test:integration",
     "test:cli": "node scripts/google-dev-cli.mjs"
   },
   "dependencies": {
@@ -29,6 +28,7 @@
     "@testing-library/preact": "^3.2.4",
     "@vitest/coverage-v8": "^4.0.18",
     "@vitest/ui": "^4.0.18",
+    "dotenv": "^16.6.1",
     "googleapis": "^171.4.0",
     "happy-dom": "^20.6.0",
     "vite": "^7.2.4",

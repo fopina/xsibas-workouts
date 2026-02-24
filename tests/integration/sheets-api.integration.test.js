@@ -21,6 +21,12 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { google } from 'googleapis';
+import { existsSync } from 'node:fs';
+import dotenv from 'dotenv';
+
+if (existsSync('.env.test')) {
+  dotenv.config({ path: '.env.test' });
+}
 
 describe('Google Sheets API Integration', () => {
   let sheets;

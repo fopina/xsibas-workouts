@@ -1,4 +1,4 @@
-name: Integration Tests
+name: Smoke Tests
 
 on:
   # Run on demand

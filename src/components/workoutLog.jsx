@@ -199,6 +199,24 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
     return null;
   };
 
+  const isImageUrl = (url) => {
+    if (!url) return false;
+    try {
+      const parsed = new URL(url);
+      const path = parsed.pathname.toLowerCase();
+      return /\.(png|jpg|jpeg|gif|webp|bmp|svg)$/.test(path);
+    } catch {
+      return false;
+    }
+  };
+
+  const getLinkType = (url) => {
+    if (!url) return null;
+    if (getYouTubeVideoId(url)) return 'youtube';
+    if (isImageUrl(url)) return 'image';
+    return 'link';
+  };
+
   useEffect(() => {
     let cancelled = false;
 
@@ -711,7 +729,8 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                           const details = exerciseDetailsMap[exercise.Exercise] || {};
                           const muscleGroup = details.muscleGroup || '';
                           const equipment = details.equipment || '';
-                          const videoId = getYouTubeVideoId(videoLink);
+                          const mediaType = getLinkType(videoLink);
+                          const videoId = mediaType === 'youtube' ? getYouTubeVideoId(videoLink) : null;
                           const exerciseKey = `${sectionName}-${exerciseIndex}`;
                           const showVideo = expandedVideos[exerciseKey];
                           const notesValue = exercise.Notes || '';
@@ -774,11 +793,11 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                                         </div>
                                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', marginLeft: 'auto' }}>
                                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            {videoId && (
+                                            {(mediaType === 'youtube' || mediaType === 'image') && (
                                               <button
                                                 onClick={() => toggleVideo(exerciseKey)}
-                                                title={showVideo ? 'Hide video' : 'Show video'}
-                                                aria-label={showVideo ? 'Hide video' : 'Show video'}
+                                                title={showVideo ? `Hide ${mediaType}` : `Show ${mediaType}`}
+                                                aria-label={showVideo ? `Hide ${mediaType}` : `Show ${mediaType}`}
                                                 style={{
                                                   padding: '2px 8px',
                                                   fontSize: '0.85em',
@@ -789,7 +808,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                                                   cursor: 'pointer'
                                                 }}
                                               >
-                                                📹
+                                                {mediaType === 'youtube' ? '📹' : '🖼️'}
                                               </button>
                                             )}
                                             {canEditSectionScore ? (
@@ -835,7 +854,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                                           </div>
                                         </div>
                                       </div>
-                                      {showVideo && videoId && (
+                                      {showVideo && mediaType === 'youtube' && videoId && (
                                         <div style={{ marginTop: '10px', marginBottom: '10px' }}>
                                           <iframe
                                             width="100%"
@@ -846,6 +865,21 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                                             allowFullScreen
                                             style={{ borderRadius: '5px', maxWidth: '560px' }}
                                           ></iframe>
+                                        </div>
+                                      )}
+                                      {showVideo && mediaType === 'image' && (
+                                        <div style={{ marginTop: '10px', marginBottom: '10px' }}>
+                                          <img
+                                            src={videoLink}
+                                            alt={`${value} media`}
+                                            style={{
+                                              width: '100%',
+                                              maxWidth: '560px',
+                                              borderRadius: '5px',
+                                              border: '1px solid #444',
+                                              display: 'block'
+                                            }}
+                                          />
                                         </div>
                                       )}
                                     </div>

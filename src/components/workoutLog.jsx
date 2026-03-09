@@ -188,8 +188,34 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
   // Helper function to extract YouTube video ID from URL
   const getYouTubeVideoId = (url) => {
     if (!url) return null;
+
+    try {
+      const parsedUrl = new URL(url);
+      const host = parsedUrl.hostname.toLowerCase();
+      if (host === 'youtube.com' || host.endsWith('.youtube.com')) {
+        const vParam = parsedUrl.searchParams.get('v');
+        if (vParam && /^[a-zA-Z0-9_-]{11}$/.test(vParam)) {
+          return vParam;
+        }
+
+        const shortPathMatch = parsedUrl.pathname.match(/^\/(?:shorts|embed)\/([a-zA-Z0-9_-]{11})(?:[/?].*)?$/);
+        if (shortPathMatch) {
+          return shortPathMatch[1];
+        }
+      }
+
+      if (host === 'youtu.be') {
+        const beMatch = parsedUrl.pathname.match(/^\/([a-zA-Z0-9_-]{11})(?:[/?].*)?$/);
+        if (beMatch) {
+          return beMatch[1];
+        }
+      }
+    } catch {
+      // Ignore and continue to regex fallback below.
+    }
+
     const patterns = [
-      /(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+      /(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})(?:[/?&?][^\/\s]*)?/,
       /^([a-zA-Z0-9_-]{11})$/ // Direct video ID
     ];
     for (const pattern of patterns) {

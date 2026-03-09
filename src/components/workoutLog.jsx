@@ -236,11 +236,51 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
     }
   };
 
+  const isMapUrl = (url) => {
+    if (!url) return false;
+    try {
+      const parsed = new URL(url);
+      const host = parsed.hostname.toLowerCase();
+      return (
+        host === 'maps.app.goo.gl' ||
+        host === 'google.com/maps' ||
+        host === 'www.google.com' && parsed.pathname.startsWith('/maps') ||
+        host.endsWith('.google.com') && parsed.pathname.startsWith('/maps')
+      );
+    } catch {
+      return false;
+    }
+  };
+
   const getLinkType = (url) => {
     if (!url) return null;
     if (getYouTubeVideoId(url)) return 'youtube';
+    if (isMapUrl(url)) return 'map';
     if (isImageUrl(url)) return 'image';
     return 'link';
+  };
+
+  const getMapPreviewUrl = (url) => {
+    try {
+      const parsed = new URL(url);
+      const host = parsed.hostname.toLowerCase();
+      const path = parsed.pathname || '';
+      const query = parsed.search || '';
+
+      if (host === 'maps.app.goo.gl' || host.endsWith('.maps.app.goo.gl')) {
+        return `https://www.google.com/maps?q=${encodeURIComponent(url)}&output=embed`;
+      }
+
+      if (host === 'google.com' && path.startsWith('/maps')) {
+        const separator = query ? '&' : '?';
+        return `https://www.google.com/maps${path}${query}${separator}output=embed`;
+      }
+
+      const googleMapsPath = parsed.pathname.startsWith('/maps') ? parsed.pathname : '/maps';
+      return `https://www.google.com${googleMapsPath}${query}`;
+    } catch {
+      return null;
+    }
   };
 
   useEffect(() => {
@@ -757,6 +797,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                           const equipment = details.equipment || '';
                           const mediaType = getLinkType(videoLink);
                           const videoId = mediaType === 'youtube' ? getYouTubeVideoId(videoLink) : null;
+                          const mapPreviewUrl = mediaType === 'map' ? getMapPreviewUrl(videoLink) : null;
                           const exerciseKey = `${sectionName}-${exerciseIndex}`;
                           const showVideo = expandedVideos[exerciseKey];
                           const notesValue = exercise.Notes || '';
@@ -819,7 +860,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                                         </div>
                                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', marginLeft: 'auto' }}>
                                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            {(mediaType === 'youtube' || mediaType === 'image') && (
+                                            {(mediaType === 'youtube' || mediaType === 'image' || mediaType === 'map') && (
                                               <button
                                                 onClick={() => toggleVideo(exerciseKey)}
                                                 title={showVideo ? `Hide ${mediaType}` : `Show ${mediaType}`}
@@ -834,7 +875,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                                                   cursor: 'pointer'
                                                 }}
                                               >
-                                                {mediaType === 'youtube' ? '📹' : '🖼️'}
+                                                {mediaType === 'youtube' ? '📹' : mediaType === 'image' ? '🖼️' : '🗺️'}
                                               </button>
                                             )}
                                             {canEditSectionScore ? (
@@ -906,6 +947,19 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                                               display: 'block'
                                             }}
                                           />
+                                        </div>
+                                      )}
+                                      {showVideo && mediaType === 'map' && mapPreviewUrl && (
+                                        <div style={{ marginTop: '10px', marginBottom: '10px' }}>
+                                          <iframe
+                                            width="100%"
+                                            height="315"
+                                            src={mapPreviewUrl}
+                                            frameBorder="0"
+                                            allowFullScreen
+                                            style={{ borderRadius: '5px', maxWidth: '560px' }}
+                                            loading="lazy"
+                                          ></iframe>
                                         </div>
                                       )}
                                     </div>

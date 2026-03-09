@@ -241,11 +241,15 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
     try {
       const parsed = new URL(url);
       const host = parsed.hostname.toLowerCase();
+      const path = parsed.pathname || '';
       return (
         host === 'maps.app.goo.gl' ||
-        host === 'google.com/maps' ||
+        host === 'google.com' ||
+        host === 'maps.google.com' ||
+        host === 'www.google.com' ||
+        host.endsWith('.google.com') ||
         host === 'www.google.com' && parsed.pathname.startsWith('/maps') ||
-        host.endsWith('.google.com') && parsed.pathname.startsWith('/maps')
+        host.endsWith('.google.com') && path.startsWith('/maps')
       );
     } catch {
       return false;
@@ -267,17 +271,33 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
       const path = parsed.pathname || '';
       const query = parsed.search || '';
 
-      if (host === 'maps.app.goo.gl' || host.endsWith('.maps.app.goo.gl')) {
-        return `https://www.google.com/maps?q=${encodeURIComponent(url)}&output=embed`;
+      if (host === 'maps.app.goo.gl' || host === 'maps.app.goo.gl?') {
+        return null;
       }
 
-      if (host === 'google.com' && path.startsWith('/maps')) {
-        const separator = query ? '&' : '?';
-        return `https://www.google.com/maps${path}${query}${separator}output=embed`;
+      const qParam = parsed.searchParams.get('q') || parsed.searchParams.get('query');
+      const originParam = parsed.searchParams.get('origin');
+      const destinationParam = parsed.searchParams.get('destination');
+      const dirParams = parsed.searchParams.get('saddr') && parsed.searchParams.get('daddr');
+
+      if (originParam && destinationParam) {
+        return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(originParam)}&destination=${encodeURIComponent(destinationParam)}&output=embed`;
       }
 
-      const googleMapsPath = parsed.pathname.startsWith('/maps') ? parsed.pathname : '/maps';
-      return `https://www.google.com${googleMapsPath}${query}`;
+      if (dirParams) {
+        return `https://www.google.com/maps/dir/?api=1&saddr=${encodeURIComponent(parsed.searchParams.get('saddr') || '')}&daddr=${encodeURIComponent(parsed.searchParams.get('daddr') || '')}&output=embed`;
+      }
+
+      if (qParam) {
+        return `https://www.google.com/maps?output=embed&q=${encodeURIComponent(qParam)}`;
+      }
+
+      if (path && path.startsWith('/maps')) {
+        const cleanSearch = query && query.includes('output=') ? query : `${query}${query ? '&' : '?'}output=embed`;
+        return `https://www.google.com${path}${cleanSearch}`;
+      }
+
+      return null;
     } catch {
       return null;
     }
@@ -949,17 +969,23 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                                           />
                                         </div>
                                       )}
-                                      {showVideo && mediaType === 'map' && mapPreviewUrl && (
+                                      {showVideo && mediaType === 'map' && (
                                         <div style={{ marginTop: '10px', marginBottom: '10px' }}>
-                                          <iframe
-                                            width="100%"
-                                            height="315"
-                                            src={mapPreviewUrl}
-                                            frameBorder="0"
-                                            allowFullScreen
-                                            style={{ borderRadius: '5px', maxWidth: '560px' }}
-                                            loading="lazy"
-                                          ></iframe>
+                                          {mapPreviewUrl ? (
+                                            <iframe
+                                              width="100%"
+                                              height="315"
+                                              src={mapPreviewUrl}
+                                              frameBorder="0"
+                                              allowFullScreen
+                                              style={{ borderRadius: '5px', maxWidth: '560px' }}
+                                              loading="lazy"
+                                            ></iframe>
+                                          ) : (
+                                            <div style={{ color: '#aaa', fontSize: '0.85em' }}>
+                                              Map preview isn&apos;t available for this short URL. Open in Google Maps using the exercise link above.
+                                            </div>
+                                          )}
                                         </div>
                                       )}
                                     </div>

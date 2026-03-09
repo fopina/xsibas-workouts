@@ -188,8 +188,34 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
   // Helper function to extract YouTube video ID from URL
   const getYouTubeVideoId = (url) => {
     if (!url) return null;
+
+    try {
+      const parsedUrl = new URL(url);
+      const host = parsedUrl.hostname.toLowerCase();
+      if (host === 'youtube.com' || host.endsWith('.youtube.com')) {
+        const vParam = parsedUrl.searchParams.get('v');
+        if (vParam && /^[a-zA-Z0-9_-]{11}$/.test(vParam)) {
+          return vParam;
+        }
+
+        const shortPathMatch = parsedUrl.pathname.match(/^\/(?:shorts|embed)\/([a-zA-Z0-9_-]{11})(?:[/?].*)?$/);
+        if (shortPathMatch) {
+          return shortPathMatch[1];
+        }
+      }
+
+      if (host === 'youtu.be') {
+        const beMatch = parsedUrl.pathname.match(/^\/([a-zA-Z0-9_-]{11})(?:[/?].*)?$/);
+        if (beMatch) {
+          return beMatch[1];
+        }
+      }
+    } catch {
+      // Ignore and continue to regex fallback below.
+    }
+
     const patterns = [
-      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+      /(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})(?:[/?&?][^\/\s]*)?/,
       /^([a-zA-Z0-9_-]{11})$/ // Direct video ID
     ];
     for (const pattern of patterns) {
@@ -197,6 +223,84 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
       if (match) return match[1];
     }
     return null;
+  };
+
+  const isImageUrl = (url) => {
+    if (!url) return false;
+    try {
+      const parsed = new URL(url);
+      const path = parsed.pathname.toLowerCase();
+      return /\.(png|jpg|jpeg|gif|webp|bmp|svg)$/.test(path);
+    } catch {
+      return false;
+    }
+  };
+
+  const isMapUrl = (url) => {
+    if (!url) return false;
+    try {
+      const parsed = new URL(url);
+      const host = parsed.hostname.toLowerCase();
+      const path = parsed.pathname || '';
+      return (
+        host === 'maps.app.goo.gl' ||
+        host === 'google.com' ||
+        host === 'maps.google.com' ||
+        host === 'www.google.com' ||
+        host.endsWith('.google.com') ||
+        host === 'www.google.com' && parsed.pathname.startsWith('/maps') ||
+        host.endsWith('.google.com') && path.startsWith('/maps')
+      );
+    } catch {
+      return false;
+    }
+  };
+
+  const getLinkType = (url) => {
+    if (!url) return null;
+    if (getYouTubeVideoId(url)) return 'youtube';
+    if (isMapUrl(url)) return 'map';
+    if (isImageUrl(url)) return 'image';
+    return 'link';
+  };
+
+  const getMapPreviewUrl = (url) => {
+    try {
+      const parsed = new URL(url);
+      const host = parsed.hostname.toLowerCase();
+      const path = parsed.pathname || '';
+      const query = parsed.search || '';
+
+      if (host === 'maps.app.goo.gl' || host === 'maps.app.goo.gl?') {
+        return null;
+      }
+
+      const qParam = parsed.searchParams.get('q') || parsed.searchParams.get('query');
+      const originParam = parsed.searchParams.get('origin');
+      const destinationParam = parsed.searchParams.get('destination');
+      const dirParams = parsed.searchParams.get('saddr') && parsed.searchParams.get('daddr');
+
+      if (originParam && destinationParam) {
+        return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(originParam)}&destination=${encodeURIComponent(destinationParam)}&output=embed`;
+      }
+
+      if (dirParams) {
+        return `https://www.google.com/maps/dir/?api=1&saddr=${encodeURIComponent(parsed.searchParams.get('saddr') || '')}&daddr=${encodeURIComponent(parsed.searchParams.get('daddr') || '')}&output=embed`;
+      }
+
+      if (qParam) {
+        return `https://www.google.com/maps?output=embed&q=${encodeURIComponent(qParam)}`;
+      }
+
+      if (path && path.startsWith('/maps')) {
+        const cleanSearch = query && query.includes('output=') ? query : `${query}${query ? '&' : '?'}output=embed`;
+        return `https://www.google.com${path}${cleanSearch}`;
+      }
+
+      return null;
+    } catch {
+      return null;
+    }
   };
 
   useEffect(() => {
@@ -711,7 +815,9 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                           const details = exerciseDetailsMap[exercise.Exercise] || {};
                           const muscleGroup = details.muscleGroup || '';
                           const equipment = details.equipment || '';
-                          const videoId = getYouTubeVideoId(videoLink);
+                          const mediaType = getLinkType(videoLink);
+                          const videoId = mediaType === 'youtube' ? getYouTubeVideoId(videoLink) : null;
+                          const mapPreviewUrl = mediaType === 'map' ? getMapPreviewUrl(videoLink) : null;
                           const exerciseKey = `${sectionName}-${exerciseIndex}`;
                           const showVideo = expandedVideos[exerciseKey];
                           const notesValue = exercise.Notes || '';
@@ -774,11 +880,11 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                                         </div>
                                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', marginLeft: 'auto' }}>
                                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            {videoId && (
+                                            {(mediaType === 'youtube' || mediaType === 'image' || mediaType === 'map') && (
                                               <button
                                                 onClick={() => toggleVideo(exerciseKey)}
-                                                title={showVideo ? 'Hide video' : 'Show video'}
-                                                aria-label={showVideo ? 'Hide video' : 'Show video'}
+                                                title={showVideo ? `Hide ${mediaType}` : `Show ${mediaType}`}
+                                                aria-label={showVideo ? `Hide ${mediaType}` : `Show ${mediaType}`}
                                                 style={{
                                                   padding: '2px 8px',
                                                   fontSize: '0.85em',
@@ -789,7 +895,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                                                   cursor: 'pointer'
                                                 }}
                                               >
-                                                📹
+                                                {mediaType === 'youtube' ? '📹' : mediaType === 'image' ? '🖼️' : '🗺️'}
                                               </button>
                                             )}
                                             {canEditSectionScore ? (
@@ -835,7 +941,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                                           </div>
                                         </div>
                                       </div>
-                                      {showVideo && videoId && (
+                                      {showVideo && mediaType === 'youtube' && videoId && (
                                         <div style={{ marginTop: '10px', marginBottom: '10px' }}>
                                           <iframe
                                             width="100%"
@@ -846,6 +952,40 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                                             allowFullScreen
                                             style={{ borderRadius: '5px', maxWidth: '560px' }}
                                           ></iframe>
+                                        </div>
+                                      )}
+                                      {showVideo && mediaType === 'image' && (
+                                        <div style={{ marginTop: '10px', marginBottom: '10px' }}>
+                                          <img
+                                            src={videoLink}
+                                            alt={`${value} media`}
+                                            style={{
+                                              width: '100%',
+                                              maxWidth: '560px',
+                                              borderRadius: '5px',
+                                              border: '1px solid #444',
+                                              display: 'block'
+                                            }}
+                                          />
+                                        </div>
+                                      )}
+                                      {showVideo && mediaType === 'map' && (
+                                        <div style={{ marginTop: '10px', marginBottom: '10px' }}>
+                                          {mapPreviewUrl ? (
+                                            <iframe
+                                              width="100%"
+                                              height="315"
+                                              src={mapPreviewUrl}
+                                              frameBorder="0"
+                                              allowFullScreen
+                                              style={{ borderRadius: '5px', maxWidth: '560px' }}
+                                              loading="lazy"
+                                            ></iframe>
+                                          ) : (
+                                            <div style={{ color: '#aaa', fontSize: '0.85em' }}>
+                                              Map preview isn&apos;t available for this short URL. Open in Google Maps using the exercise link above.
+                                            </div>
+                                          )}
                                         </div>
                                       )}
                                     </div>

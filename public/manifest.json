@@ -3,6 +3,7 @@
   "short_name": "XSibas",
   "description": "Track your workouts with Google Sheets integration",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#1a1a1a",
   "theme_color": "#8bc34a",

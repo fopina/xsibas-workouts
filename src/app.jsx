@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import Auth from './components/auth';
 import WorkoutLog from './components/workoutLog';
 import Landing from './components/landing';
@@ -12,6 +12,7 @@ const LAST_VIEW_KEY = 'workout_last_view';
 const getCurrentRoute = () => `${window.location.pathname}${window.location.search}`;
 
 export function App() {
+  const authActionsRef = useRef(null);
   const [accessToken, setAccessToken] = useState(null);
   const [forceLogoutVersion, setForceLogoutVersion] = useState(0);
   const [isGapiLoaded, setIsGapiLoaded] = useState(false);
@@ -281,6 +282,19 @@ export function App() {
 
   const handleAuthChange = (token) => {
     setAccessToken(token);
+  };
+
+  const handleAuthApiReady = (actions) => {
+    authActionsRef.current = actions;
+  };
+
+  const requestSilentAuthRefresh = async () => {
+    const refreshFn = authActionsRef.current?.refreshAccessTokenSilently;
+    if (!refreshFn) {
+      return null;
+    }
+
+    return refreshFn('api_auth_error');
   };
 
   const openPicker = () => {
@@ -670,7 +684,11 @@ export function App() {
               Sheet
             </button>
           )}
-          <Auth onAuthChange={handleAuthChange} forceLogoutVersion={forceLogoutVersion} />
+          <Auth
+            onAuthChange={handleAuthChange}
+            onAuthApiReady={handleAuthApiReady}
+            forceLogoutVersion={forceLogoutVersion}
+          />
         </div>
       </header>
       <main>
@@ -810,6 +828,7 @@ export function App() {
             accessToken={accessToken}
             sheetId={sheetId}
             onSheetTitleLoaded={updateSheetTitle}
+            onAuthRefreshRequested={requestSilentAuthRefresh}
             onSessionExpired={() => {
               setAccessToken(null);
               setForceLogoutVersion(v => v + 1);

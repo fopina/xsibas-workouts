@@ -1,23 +1,46 @@
 import { useEffect, useRef, useState, useCallback } from 'preact/hooks';
 
+const formatWakeLockError = (err, context = 'Unknown wake lock error') => {
+  if (!err) {
+    return context;
+  }
+
+  if (err.name && err.message) {
+    return `${context}: ${err.name} - ${err.message}`;
+  }
+
+  if (err.message) {
+    return `${context}: ${err.message}`;
+  }
+
+  if (typeof err === 'string') {
+    return `${context}: ${err}`;
+  }
+
+  return context;
+};
+
 export const useWakeLock = () => {
   const wakeLockRef = useRef(null);
+  const requestInFlightRef = useRef(null);
   const [isSupported, setIsSupported] = useState(true);
   const [isActive, setIsActive] = useState(false);
   const [isEnabled, setIsEnabled] = useState(false);
+  const [isRequesting, setIsRequesting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [lastEvent, setLastEvent] = useState('idle');
 
   useEffect(() => {
     console.log('[WakeLock] useEffect: Starting wake lock hook');
     console.log('[WakeLock] Navigator has wakeLock:', 'wakeLock' in navigator);
 
-    // Check if Wake Lock API is supported
     if (!('wakeLock' in navigator)) {
       console.log('[WakeLock] ✗ Wake Lock API not supported in this browser');
       setIsSupported(false);
+      setLastEvent('unsupported');
       return;
     }
 
-    // Load saved preference
     try {
       const saved = localStorage.getItem('wakeLockEnabled');
       if (saved !== null) {
@@ -30,53 +53,93 @@ export const useWakeLock = () => {
     }
   }, []);
 
-  const requestWakeLock = useCallback(async () => {
-    console.log('[WakeLock] requestWakeLock: Called');
+  const requestWakeLock = useCallback(async (reason = 'manual') => {
+    console.log('[WakeLock] requestWakeLock: Called, reason:', reason);
     console.log('[WakeLock] Current wakeLockRef:', wakeLockRef.current);
 
-    // Don't request if already active
     if (wakeLockRef.current !== null) {
       console.log('[WakeLock] Wake lock already active, skipping request');
-      return true;
-    }
-
-    try {
-      console.log('[WakeLock] Requesting wake lock...');
-      console.trace('[WakeLock] Stack trace for request');
-      wakeLockRef.current = await navigator.wakeLock.request('screen');
-      console.log('[WakeLock] ✓ Wake Lock activated successfully');
-      console.log('[WakeLock] Wake lock object:', wakeLockRef.current);
-      console.log('[WakeLock] Wake lock type:', wakeLockRef.current?.type);
-      console.log('[WakeLock] Wake lock released:', wakeLockRef.current?.released);
       setIsActive(true);
-
-      wakeLockRef.current.addEventListener('release', () => {
-        console.log('[WakeLock] ⚠ Wake Lock released (event fired)');
-        wakeLockRef.current = null;
-        setIsActive(false);
-      });
-
+      setIsRequesting(false);
+      setErrorMessage('');
+      setLastEvent('active');
       return true;
-    } catch (err) {
-      console.error('[WakeLock] ✗ Wake Lock request failed:', err);
-      console.error('[WakeLock] Error name:', err.name);
-      console.error('[WakeLock] Error message:', err.message);
-      console.error('[WakeLock] Full error object:', err);
-      console.trace('[WakeLock] Stack trace for error');
-
-      // Only mark as unsupported if it's a real support issue
-      if (err.name === 'NotSupportedError') {
-        setIsSupported(false);
-      } else if (err.name === 'NotAllowedError') {
-        console.warn('[WakeLock] Permission denied - user interaction may not be valid or page may not be focused');
-      }
-
-      return false;
     }
-  }, []);
 
-  const releaseWakeLock = useCallback(async () => {
-    console.log('[WakeLock] releaseWakeLock: Called');
+    if (requestInFlightRef.current) {
+      console.log('[WakeLock] Request already in flight, waiting for existing request');
+      return requestInFlightRef.current;
+    }
+
+    setIsRequesting(true);
+    setErrorMessage('');
+    setLastEvent(`requesting:${reason}`);
+
+    const requestPromise = (async () => {
+      try {
+        console.log('[WakeLock] Requesting wake lock...');
+        console.trace('[WakeLock] Stack trace for request');
+        const sentinel = await navigator.wakeLock.request('screen');
+        wakeLockRef.current = sentinel;
+        console.log('[WakeLock] ✓ Wake Lock activated successfully');
+        console.log('[WakeLock] Wake lock object:', wakeLockRef.current);
+        console.log('[WakeLock] Wake lock type:', wakeLockRef.current?.type);
+        console.log('[WakeLock] Wake lock released:', wakeLockRef.current?.released);
+
+        setIsActive(true);
+        setIsRequesting(false);
+        setErrorMessage('');
+        setLastEvent('active');
+
+        wakeLockRef.current.addEventListener('release', () => {
+          console.log('[WakeLock] ⚠ Wake Lock released (event fired)');
+          wakeLockRef.current = null;
+          setIsActive(false);
+          setIsRequesting(false);
+          setLastEvent(document.visibilityState === 'visible' && isEnabled ? 'released-unexpectedly' : 'released');
+        });
+
+        return true;
+      } catch (err) {
+        console.error('[WakeLock] ✗ Wake Lock request failed:', err);
+        console.error('[WakeLock] Error name:', err.name);
+        console.error('[WakeLock] Error message:', err.message);
+        console.error('[WakeLock] Full error object:', err);
+        console.trace('[WakeLock] Stack trace for error');
+
+        const formatted = formatWakeLockError(err, `Wake lock request failed during ${reason}`);
+        setErrorMessage(formatted);
+        setIsActive(false);
+        setIsEnabled(false);
+        setIsRequesting(false);
+        setLastEvent('request-failed');
+
+        try {
+          localStorage.setItem('wakeLockEnabled', JSON.stringify(false));
+        } catch (storageErr) {
+          console.warn('[WakeLock] Failed to persist disabled state after request failure:', storageErr);
+        }
+
+        if (err.name === 'NotSupportedError') {
+          setIsSupported(false);
+        } else if (err.name === 'NotAllowedError') {
+          console.warn('[WakeLock] Permission denied - user interaction may not be valid or page may not be focused');
+        }
+
+        return false;
+      } finally {
+        requestInFlightRef.current = null;
+      }
+    })();
+
+    requestInFlightRef.current = requestPromise;
+    return requestPromise;
+  }, [isEnabled]);
+
+  const releaseWakeLock = useCallback(async (reason = 'manual') => {
+    console.log('[WakeLock] releaseWakeLock: Called, reason:', reason);
+    setIsRequesting(false);
+
     if (wakeLockRef.current !== null) {
       console.log('[WakeLock] Releasing wake lock...');
       try {
@@ -84,8 +147,11 @@ export const useWakeLock = () => {
         console.log('[WakeLock] Wake lock released successfully');
         wakeLockRef.current = null;
         setIsActive(false);
+        setLastEvent(`released:${reason}`);
       } catch (err) {
         console.error('[WakeLock] Wake lock release failed:', err);
+        setErrorMessage(formatWakeLockError(err, `Wake lock release failed during ${reason}`));
+        setLastEvent('release-failed');
       }
     } else {
       console.log('[WakeLock] No active wake lock to release');
@@ -97,7 +163,6 @@ export const useWakeLock = () => {
     const newEnabled = !isEnabled;
     setIsEnabled(newEnabled);
 
-    // Save preference
     try {
       localStorage.setItem('wakeLockEnabled', JSON.stringify(newEnabled));
       console.log('[WakeLock] Saved preference:', newEnabled);
@@ -106,13 +171,13 @@ export const useWakeLock = () => {
     }
 
     if (newEnabled) {
-      await requestWakeLock();
+      await requestWakeLock('toggle-on');
     } else {
-      await releaseWakeLock();
+      setErrorMessage('');
+      await releaseWakeLock('toggle-off');
     }
   }, [isEnabled, requestWakeLock, releaseWakeLock]);
 
-  // Re-acquire wake lock when page becomes visible (if enabled)
   useEffect(() => {
     if (!isSupported || !isEnabled) return;
 
@@ -124,7 +189,7 @@ export const useWakeLock = () => {
 
       if (document.visibilityState === 'visible' && wakeLockRef.current === null && isEnabled) {
         console.log('[WakeLock] Page visible and no active lock - re-acquiring wake lock');
-        await requestWakeLock();
+        await requestWakeLock('visibility-visible');
       }
     };
 
@@ -137,23 +202,22 @@ export const useWakeLock = () => {
     };
   }, [isSupported, isEnabled, requestWakeLock]);
 
-  // Request/release wake lock when enabled state changes
   useEffect(() => {
     if (!isSupported) return;
 
     if (isEnabled) {
       console.log('[WakeLock] Enabled - requesting wake lock');
-      requestWakeLock();
+      requestWakeLock('enabled-effect');
     } else if (wakeLockRef.current !== null) {
       console.log('[WakeLock] Disabled - releasing wake lock');
-      releaseWakeLock();
+      releaseWakeLock('disabled-effect');
     }
   }, [isEnabled, isSupported, requestWakeLock, releaseWakeLock]);
 
-  // Cleanup: release wake lock on unmount
   useEffect(() => {
     return () => {
       console.log('[WakeLock] Cleanup: Checking if wake lock needs to be released');
+      requestInFlightRef.current = null;
       if (wakeLockRef.current !== null) {
         console.log('[WakeLock] Cleanup: Releasing wake lock...');
         wakeLockRef.current.release()
@@ -167,6 +231,6 @@ export const useWakeLock = () => {
     };
   }, []);
 
-  console.log('[WakeLock] Returning from hook - isSupported:', isSupported, 'isActive:', isActive, 'isEnabled:', isEnabled);
-  return { isSupported, isActive, isEnabled, toggleWakeLock };
+  console.log('[WakeLock] Returning from hook - isSupported:', isSupported, 'isActive:', isActive, 'isEnabled:', isEnabled, 'isRequesting:', isRequesting, 'lastEvent:', lastEvent, 'errorMessage:', errorMessage);
+  return { isSupported, isActive, isEnabled, isRequesting, errorMessage, lastEvent, toggleWakeLock };
 };

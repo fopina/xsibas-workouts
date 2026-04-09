@@ -29,6 +29,7 @@ export const useWakeLock = () => {
   const [isRequesting, setIsRequesting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [lastEvent, setLastEvent] = useState('idle');
+  const [needsUserGesture, setNeedsUserGesture] = useState(false);
 
   useEffect(() => {
     console.log('[WakeLock] useEffect: Starting wake lock hook');
@@ -89,6 +90,7 @@ export const useWakeLock = () => {
         setIsActive(true);
         setIsRequesting(false);
         setErrorMessage('');
+        setNeedsUserGesture(false);
         setLastEvent('active');
 
         wakeLockRef.current.addEventListener('release', () => {
@@ -108,22 +110,25 @@ export const useWakeLock = () => {
         console.trace('[WakeLock] Stack trace for error');
 
         const formatted = formatWakeLockError(err, `Wake lock request failed during ${reason}`);
-        setErrorMessage(formatted);
+        const requiresGesture = err.name === 'NotAllowedError' && reason !== 'toggle-on';
+        setErrorMessage(requiresGesture ? 'Wake lock needs a tap to re-enable on this device' : formatted);
         setIsActive(false);
-        setIsEnabled(false);
         setIsRequesting(false);
-        setLastEvent('request-failed');
-
-        try {
-          localStorage.setItem('wakeLockEnabled', JSON.stringify(false));
-        } catch (storageErr) {
-          console.warn('[WakeLock] Failed to persist disabled state after request failure:', storageErr);
-        }
+        setNeedsUserGesture(requiresGesture);
+        setLastEvent(requiresGesture ? 'needs-user-gesture' : 'request-failed');
 
         if (err.name === 'NotSupportedError') {
           setIsSupported(false);
         } else if (err.name === 'NotAllowedError') {
           console.warn('[WakeLock] Permission denied - user interaction may not be valid or page may not be focused');
+          if (!requiresGesture) {
+            setIsEnabled(false);
+            try {
+              localStorage.setItem('wakeLockEnabled', JSON.stringify(false));
+            } catch (storageErr) {
+              console.warn('[WakeLock] Failed to persist disabled state after request failure:', storageErr);
+            }
+          }
         }
 
         return false;
@@ -147,6 +152,7 @@ export const useWakeLock = () => {
         console.log('[WakeLock] Wake lock released successfully');
         wakeLockRef.current = null;
         setIsActive(false);
+        setNeedsUserGesture(false);
         setLastEvent(`released:${reason}`);
       } catch (err) {
         console.error('[WakeLock] Wake lock release failed:', err);
@@ -174,6 +180,7 @@ export const useWakeLock = () => {
       await requestWakeLock('toggle-on');
     } else {
       setErrorMessage('');
+      setNeedsUserGesture(false);
       await releaseWakeLock('toggle-off');
     }
   }, [isEnabled, requestWakeLock, releaseWakeLock]);
@@ -231,6 +238,6 @@ export const useWakeLock = () => {
     };
   }, []);
 
-  console.log('[WakeLock] Returning from hook - isSupported:', isSupported, 'isActive:', isActive, 'isEnabled:', isEnabled, 'isRequesting:', isRequesting, 'lastEvent:', lastEvent, 'errorMessage:', errorMessage);
-  return { isSupported, isActive, isEnabled, isRequesting, errorMessage, lastEvent, toggleWakeLock };
+  console.log('[WakeLock] Returning from hook - isSupported:', isSupported, 'isActive:', isActive, 'isEnabled:', isEnabled, 'isRequesting:', isRequesting, 'needsUserGesture:', needsUserGesture, 'lastEvent:', lastEvent, 'errorMessage:', errorMessage);
+  return { isSupported, isActive, isEnabled, isRequesting, needsUserGesture, errorMessage, lastEvent, toggleWakeLock };
 };

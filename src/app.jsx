@@ -141,7 +141,7 @@ export function App() {
 
   // Prevent screen sleep throughout the app
   console.log('[App] Calling useWakeLock hook');
-  const { isSupported, isActive, isEnabled, isRequesting, errorMessage, lastEvent, toggleWakeLock } = useWakeLock();
+  const { isSupported, isActive, isEnabled, isRequesting, needsUserGesture, errorMessage, lastEvent, toggleWakeLock } = useWakeLock();
   console.log('[App] useWakeLock returned - isSupported:', isSupported, 'isActive:', isActive, 'isEnabled:', isEnabled);
 
   // Extract sheet ID from Google Sheets URL or return as-is if already an ID
@@ -763,7 +763,11 @@ export function App() {
               <span style={{ color: isActive ? '#8bc34a' : '#999' }}>
                 {isActive ? '✓' : '○'} Keep screen awake
               </span>
-              {errorMessage ? (
+              {needsUserGesture ? (
+                <span style={{ color: '#ffb347', fontSize: '0.85em' }}>
+                  (tap to re-enable)
+                </span>
+              ) : errorMessage ? (
                 <span style={{ color: '#ff6b6b', fontSize: '0.85em' }}>
                   ({errorMessage})
                 </span>
@@ -774,7 +778,7 @@ export function App() {
               )}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.25em' }}>
-              {!errorMessage && isEnabled && !isActive && lastEvent && (
+              {!errorMessage && !needsUserGesture && isEnabled && !isActive && lastEvent && (
                 <span style={{ color: '#888', fontSize: '0.75em' }}>
                   state: {lastEvent}
                 </span>

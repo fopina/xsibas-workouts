@@ -113,22 +113,21 @@ export const useWakeLock = () => {
         const requiresGesture = err.name === 'NotAllowedError' && reason !== 'toggle-on';
         setErrorMessage(requiresGesture ? 'Wake lock needs a tap to re-enable on this device' : formatted);
         setIsActive(false);
+        setIsEnabled(false);
         setIsRequesting(false);
         setNeedsUserGesture(requiresGesture);
         setLastEvent(requiresGesture ? 'needs-user-gesture' : 'request-failed');
+
+        try {
+          localStorage.setItem('wakeLockEnabled', JSON.stringify(false));
+        } catch (storageErr) {
+          console.warn('[WakeLock] Failed to persist disabled state after request failure:', storageErr);
+        }
 
         if (err.name === 'NotSupportedError') {
           setIsSupported(false);
         } else if (err.name === 'NotAllowedError') {
           console.warn('[WakeLock] Permission denied - user interaction may not be valid or page may not be focused');
-          if (!requiresGesture) {
-            setIsEnabled(false);
-            try {
-              localStorage.setItem('wakeLockEnabled', JSON.stringify(false));
-            } catch (storageErr) {
-              console.warn('[WakeLock] Failed to persist disabled state after request failure:', storageErr);
-            }
-          }
         }
 
         return false;

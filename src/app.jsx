@@ -790,14 +790,14 @@ export function App() {
                 gap: '0.5em'
               }}>
                 <span style={{ fontSize: '0.85em', color: '#999' }}>
-                  {isEnabled ? 'ON' : 'OFF'}
+                  {isEnabled && !needsUserGesture ? 'ON' : 'OFF'}
                 </span>
                 <div
                   onClick={toggleWakeLock}
                   style={{
                     width: '44px',
                     height: '24px',
-                    backgroundColor: isEnabled ? '#8bc34a' : '#555',
+                    backgroundColor: isEnabled && !needsUserGesture ? '#8bc34a' : '#555',
                     borderRadius: '12px',
                     position: 'relative',
                     transition: 'background-color 0.2s',
@@ -811,7 +811,7 @@ export function App() {
                     borderRadius: '50%',
                     position: 'absolute',
                     top: '2px',
-                    left: isEnabled ? '22px' : '2px',
+                    left: isEnabled && !needsUserGesture ? '22px' : '2px',
                     transition: 'left 0.2s'
                   }} />
                 </div>

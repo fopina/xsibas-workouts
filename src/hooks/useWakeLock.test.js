@@ -247,4 +247,31 @@ describe('useWakeLock', () => {
     expect(console.warn).toHaveBeenCalled();
     expect(result.current.isEnabled).toBe(true); // Should still work
   });
+
+  it('should reset to off and require one tap after gesture-required startup failure', async () => {
+    localStorageMock.getItem.mockReturnValue('true');
+    mockWakeLock.request.mockRejectedValue({ name: 'NotAllowedError', message: 'Gesture required' });
+
+    const { result } = renderHook(() => useWakeLock());
+
+    await waitFor(() => {
+      expect(result.current.isEnabled).toBe(false);
+      expect(result.current.needsUserGesture).toBe(true);
+      expect(result.current.errorMessage).toBe('Wake lock needs a tap to re-enable on this device');
+      expect(localStorageMock.setItem).toHaveBeenCalledWith('wakeLockEnabled', 'false');
+    });
+
+    mockWakeLock.request.mockResolvedValue(mockWakeLockInstance);
+
+    await act(async () => {
+      await result.current.toggleWakeLock();
+    });
+
+    await waitFor(() => {
+      expect(result.current.isEnabled).toBe(true);
+      expect(result.current.isActive).toBe(true);
+      expect(result.current.needsUserGesture).toBe(false);
+      expect(mockWakeLock.request).toHaveBeenCalledTimes(2);
+    });
+  });
 });

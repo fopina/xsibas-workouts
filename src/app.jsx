@@ -703,10 +703,7 @@ export function App() {
             fontSize: '0.9em',
             color: '#ffb3b3'
           }}>
-            <div>{authUiMessage}</div>
-            <div style={{ marginTop: '0.35em', fontSize: '0.8em', color: '#aaa' }}>
-              stored email hint: {localStorage.getItem('google_user_email') || 'none'}
-            </div>
+            {authUiMessage}
           </div>
         )}
 

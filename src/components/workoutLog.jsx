@@ -552,26 +552,28 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
   }
 
   if (error) {
-    // Don't show the "open it in Sheets" link for authentication errors
+    // Don't show the local auth-expired block, the app/header handles that state.
     const isAuthError = error === 'Login expired. Login again';
+
+    if (isAuthError) {
+      return null;
+    }
 
     return (
       <div style={{ color: 'red' }}>
         <p>{error}</p>
-        {!isAuthError && (
-          <p style={{ marginTop: '1em', fontSize: '0.9em' }}>
-            Can you{' '}
-            <a
-              href={`https://docs.google.com/spreadsheets/d/${sheetId}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: '#646cff', textDecoration: 'underline' }}
-            >
-              open it in Sheets
-            </a>
-            ? If you can access it there, the sharing permissions may need to be adjusted.
-          </p>
-        )}
+        <p style={{ marginTop: '1em', fontSize: '0.9em' }}>
+          Can you{' '}
+          <a
+            href={`https://docs.google.com/spreadsheets/d/${sheetId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#646cff', textDecoration: 'underline' }}
+          >
+            open it in Sheets
+          </a>
+          ? If you can access it there, the sharing permissions may need to be adjusted.
+        </p>
       </div>
     );
   }

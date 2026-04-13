@@ -2,33 +2,33 @@ import { useState, useEffect } from 'preact/hooks';
 
 const STORAGE_KEY = 'google_access_token';
 const USER_NAME_KEY = 'google_user_name';
+const USER_EMAIL_KEY = 'google_user_email';
 
-const Auth = ({ onAuthChange, forceLogoutVersion = 0 }) => {
+const Auth = ({ accessToken, onAuthChange, forceLogoutVersion = 0 }) => {
   const [tokenClient, setTokenClient] = useState(null);
-  const [accessToken, setAccessToken] = useState(null);
   const [userName, setUserName] = useState(null);
 
-  const clearAuthState = () => {
-    setAccessToken(null);
+  const clearAuthState = ({ clearStoredEmail = false } = {}) => {
     setUserName(null);
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(USER_NAME_KEY);
+    if (clearStoredEmail) {
+      localStorage.removeItem(USER_EMAIL_KEY);
+    }
     onAuthChange(null);
   };
 
-  // Restore token and user name from localStorage on mount
   useEffect(() => {
     const storedToken = localStorage.getItem(STORAGE_KEY);
     const storedUserName = localStorage.getItem(USER_NAME_KEY);
     if (storedToken) {
       console.log('Restored token from localStorage');
-      setAccessToken(storedToken);
       onAuthChange(storedToken);
       if (storedUserName) {
         setUserName(storedUserName);
       }
     }
-  }, [onAuthChange]);
+  }, []);
 
   useEffect(() => {
     const initializeGis = () => {
@@ -37,15 +37,13 @@ const Auth = ({ onAuthChange, forceLogoutVersion = 0 }) => {
         console.log('Client ID:', import.meta.env.VITE_GOOGLE_CLIENT_ID);
         const client = window.google.accounts.oauth2.initTokenClient({
           client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-          scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile',
+          scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
           callback: async (tokenResponse) => {
             console.log('Token response received:', tokenResponse);
             if (tokenResponse && tokenResponse.access_token) {
-              setAccessToken(tokenResponse.access_token);
               localStorage.setItem(STORAGE_KEY, tokenResponse.access_token);
               onAuthChange(tokenResponse.access_token);
 
-              // Fetch user info to get the name
               try {
                 const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
                   headers: {
@@ -56,6 +54,9 @@ const Auth = ({ onAuthChange, forceLogoutVersion = 0 }) => {
                 if (userInfo.name) {
                   setUserName(userInfo.name);
                   localStorage.setItem(USER_NAME_KEY, userInfo.name);
+                }
+                if (userInfo.email) {
+                  localStorage.setItem(USER_EMAIL_KEY, userInfo.email);
                 }
               } catch (err) {
                 console.error('Error fetching user info:', err);
@@ -68,8 +69,6 @@ const Auth = ({ onAuthChange, forceLogoutVersion = 0 }) => {
       }
     };
 
-    // The GIS script is loaded asynchronously. We need to wait for it.
-    // A simple timeout is used here, but a more robust solution could be implemented.
     const checkGisReady = setInterval(() => {
       if (window.google && window.google.accounts) {
         clearInterval(checkGisReady);
@@ -84,10 +83,9 @@ const Auth = ({ onAuthChange, forceLogoutVersion = 0 }) => {
     console.log('Login button clicked');
     console.log('Token client available:', !!tokenClient);
     if (tokenClient) {
-      // Prompt the user to select a Google Account and ask for consent to share their data
-      // when establishing a new session.
-      console.log('Requesting access token...');
-      tokenClient.requestAccessToken();
+      const loginHint = localStorage.getItem(USER_EMAIL_KEY);
+      console.log('Requesting access token...', loginHint ? 'with login hint' : 'without login hint');
+      tokenClient.requestAccessToken(loginHint ? { hint: loginHint } : {});
     } else {
       console.error('Token client not initialized');
     }
@@ -95,19 +93,17 @@ const Auth = ({ onAuthChange, forceLogoutVersion = 0 }) => {
 
   const handleLogout = () => {
     const tokenToRevoke = accessToken;
-    clearAuthState();
+    clearAuthState({ clearStoredEmail: true });
 
     if (tokenToRevoke && window.google?.accounts?.oauth2?.revoke) {
-      // Revoke in background; do not block local logout on callback.
       window.google.accounts.oauth2.revoke(tokenToRevoke, () => {});
     }
   };
 
-  // Force logout when session is detected as expired by API calls.
   useEffect(() => {
     if (forceLogoutVersion === 0) return;
 
-    clearAuthState();
+    clearAuthState({ clearStoredEmail: false });
   }, [forceLogoutVersion]);
 
   return (

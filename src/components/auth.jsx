@@ -84,8 +84,8 @@ const Auth = ({ accessToken, onAuthChange, forceLogoutVersion = 0 }) => {
     console.log('Token client available:', !!tokenClient);
     if (tokenClient) {
       const loginHint = localStorage.getItem(USER_EMAIL_KEY);
-      console.log('Requesting access token...', loginHint ? 'with login hint' : 'without login hint');
-      tokenClient.requestAccessToken(loginHint ? { hint: loginHint } : {});
+      console.log('Requesting access token...', loginHint ? 'with login_hint' : 'without login_hint');
+      tokenClient.requestAccessToken(loginHint ? { login_hint: loginHint } : {});
     } else {
       console.error('Token client not initialized');
     }

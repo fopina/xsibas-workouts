@@ -14,6 +14,7 @@ const getCurrentRoute = () => `${window.location.pathname}${window.location.sear
 export function App() {
   const [accessToken, setAccessToken] = useState(null);
   const [forceLogoutVersion, setForceLogoutVersion] = useState(0);
+  const [authUiMessage, setAuthUiMessage] = useState('');
   const [isGapiLoaded, setIsGapiLoaded] = useState(false);
   const [sheetId, setSheetId] = useState('');
   const [inputValue, setInputValue] = useState('');
@@ -281,6 +282,9 @@ export function App() {
 
   const handleAuthChange = (token) => {
     setAccessToken(token);
+    if (token) {
+      setAuthUiMessage('');
+    }
   };
 
   const openPicker = () => {
@@ -670,7 +674,7 @@ export function App() {
               Sheet
             </button>
           )}
-          <Auth onAuthChange={handleAuthChange} forceLogoutVersion={forceLogoutVersion} />
+          <Auth accessToken={accessToken} onAuthChange={handleAuthChange} forceLogoutVersion={forceLogoutVersion} />
         </div>
       </header>
       <main>
@@ -686,6 +690,20 @@ export function App() {
             textAlign: 'center'
           }}>
             {shareMessage}
+          </div>
+        )}
+
+        {authUiMessage && (
+          <div style={{
+            backgroundColor: '#2a1a1a',
+            border: '1px solid #a44',
+            borderRadius: '4px',
+            padding: '0.75em',
+            marginBottom: '1em',
+            fontSize: '0.9em',
+            color: '#ffb3b3'
+          }}>
+            {authUiMessage}
           </div>
         )}
 
@@ -828,6 +846,7 @@ export function App() {
             sheetId={sheetId}
             onSheetTitleLoaded={updateSheetTitle}
             onSessionExpired={() => {
+              setAuthUiMessage('Login expired. Login again');
               setAccessToken(null);
               setForceLogoutVersion(v => v + 1);
             }}

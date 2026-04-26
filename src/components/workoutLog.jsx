@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import { validateSpreadsheetSchema, formatValidationErrors } from '../utils/schemaValidator';
 
 // We access gapi via the window object, as it's loaded from a script tag.
@@ -119,6 +119,13 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
   const [weekDates, setWeekDates] = useState([]);
   const [viewMode, setViewMode] = useState('week'); // 'week' or 'month'
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const weekDragStateRef = useRef({
+    pointerId: null,
+    startX: 0,
+    startY: 0,
+    dragging: false,
+    navigated: false,
+  });
 
   const toggleVideo = (exerciseKey) => {
     setExpandedVideos(prev => ({
@@ -183,6 +190,57 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
     const newMonth = new Date(currentMonth);
     newMonth.setMonth(currentMonth.getMonth() + offset);
     setCurrentMonth(newMonth);
+  };
+
+  const shiftSelectedDateByDays = (days) => {
+    setSelectedDate(prev => {
+      const next = new Date(prev);
+      next.setDate(prev.getDate() + days);
+      return next;
+    });
+  };
+
+  const handleWeekPointerDown = (event) => {
+    if (viewMode !== 'week') return;
+    weekDragStateRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      dragging: false,
+      navigated: false,
+    };
+  };
+
+  const handleWeekPointerMove = (event) => {
+    const state = weekDragStateRef.current;
+    if (state.pointerId !== event.pointerId || state.navigated) return;
+
+    const deltaX = event.clientX - state.startX;
+    const deltaY = event.clientY - state.startY;
+
+    if (!state.dragging) {
+      if (Math.abs(deltaX) < 18 || Math.abs(deltaX) <= Math.abs(deltaY)) {
+        return;
+      }
+      state.dragging = true;
+    }
+
+    if (Math.abs(deltaX) >= 50) {
+      shiftSelectedDateByDays(deltaX > 0 ? -7 : 7);
+      state.navigated = true;
+    }
+  };
+
+  const resetWeekPointerState = (event) => {
+    const state = weekDragStateRef.current;
+    if (event && state.pointerId !== event.pointerId) return;
+    weekDragStateRef.current = {
+      pointerId: null,
+      startX: 0,
+      startY: 0,
+      dragging: false,
+      navigated: false,
+    };
   };
 
   // Helper function to extract YouTube video ID from URL
@@ -719,13 +777,21 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
       {viewMode === 'week' ? (
         // Week View
         <div>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(7, 1fr)',
-            gap: '5px',
-            marginBottom: '20px',
-            width: '100%'
-          }}>
+          <div
+            onPointerDown={handleWeekPointerDown}
+            onPointerMove={handleWeekPointerMove}
+            onPointerUp={resetWeekPointerState}
+            onPointerCancel={resetWeekPointerState}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(7, 1fr)',
+              gap: '5px',
+              marginBottom: '20px',
+              width: '100%',
+              touchAction: 'pan-y',
+              userSelect: 'none'
+            }}
+          >
             {weekDates.map((date, index) => {
               const hasWorkoutOnDate = hasWorkout(date);
               const isSelected = isSelectedDate(date);
@@ -734,7 +800,12 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
               return (
                 <div
                   key={index}
-                  onClick={() => setSelectedDate(date)}
+                  onClick={() => {
+                    if (weekDragStateRef.current.dragging || weekDragStateRef.current.navigated) {
+                      return;
+                    }
+                    setSelectedDate(date);
+                  }}
                   style={{
                     padding: '10px 5px',
                     textAlign: 'center',

@@ -121,6 +121,12 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [weekDragOffset, setWeekDragOffset] = useState(0);
   const [weekSlideTransition, setWeekSlideTransition] = useState('transform 0.18s ease-out');
+  const [focusedSectionName, setFocusedSectionName] = useState(null);
+  const [focusedSectionExercises, setFocusedSectionExercises] = useState([]);
+  const [focusedSectionPrescription, setFocusedSectionPrescription] = useState('');
+  const [sectionStopwatchSeconds, setSectionStopwatchSeconds] = useState(0);
+  const [sectionStopwatchRunning, setSectionStopwatchRunning] = useState(false);
+  const [sectionRoundCount, setSectionRoundCount] = useState(0);
   const weekDragStateRef = useRef({
     pointerId: null,
     startX: 0,
@@ -128,6 +134,16 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
     dragging: false,
     navigated: false,
   });
+
+  useEffect(() => {
+    if (!sectionStopwatchRunning) return;
+
+    const intervalId = window.setInterval(() => {
+      setSectionStopwatchSeconds(prev => prev + 1);
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [sectionStopwatchRunning]);
 
   const toggleVideo = (exerciseKey) => {
     setExpandedVideos(prev => ({
@@ -186,6 +202,37 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
   const handleDayClick = (date) => {
     setSelectedDate(date);
     setViewMode('week');
+  };
+
+  const formatStopwatchTime = (totalSeconds) => {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    const mm = String(minutes).padStart(2, '0');
+    const ss = String(seconds).padStart(2, '0');
+    if (hours > 0) {
+      return `${String(hours).padStart(2, '0')}:${mm}:${ss}`;
+    }
+    return `${mm}:${ss}`;
+  };
+
+  const openFocusedSection = (sectionName, sectionPrescription, exercises) => {
+    setFocusedSectionName(sectionName);
+    setFocusedSectionPrescription(sectionPrescription || '');
+    setFocusedSectionExercises(exercises);
+    setSectionStopwatchSeconds(0);
+    setSectionStopwatchRunning(false);
+    setSectionRoundCount(0);
+  };
+
+  const closeFocusedSection = () => {
+    setFocusedSectionName(null);
+    setFocusedSectionPrescription('');
+    setFocusedSectionExercises([]);
+    setSectionStopwatchRunning(false);
+    setSectionStopwatchSeconds(0);
+    setSectionRoundCount(0);
   };
 
   const changeMonth = (offset) => {
@@ -775,6 +822,153 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
     }
   };
 
+  if (focusedSectionName) {
+    return (
+      <div style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 2000,
+        backgroundColor: '#111',
+        color: '#fff',
+        overflowY: 'auto',
+        padding: '20px'
+      }}>
+        <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '16px' }}>
+            <div>
+              <h2 style={{ margin: 0, color: '#8bc34a' }}>{focusedSectionName}</h2>
+              {focusedSectionPrescription && (
+                <p style={{ marginTop: '6px', color: '#aaa', fontStyle: 'italic' }}>{focusedSectionPrescription}</p>
+              )}
+            </div>
+            <button onClick={closeFocusedSection} style={{ fontSize: '0.95em', padding: '0.6em 1em' }}>
+              Exit
+            </button>
+          </div>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: '12px',
+            marginBottom: '24px'
+          }}>
+            <div style={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '10px', padding: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                <div style={{ color: '#999', fontSize: '0.85em' }}>Stopwatch</div>
+                <button
+                  onClick={() => {
+                    setSectionStopwatchRunning(false);
+                    setSectionStopwatchSeconds(0);
+                  }}
+                  title="Reset timer"
+                  aria-label="Reset timer"
+                  style={{
+                    padding: '2px 8px',
+                    fontSize: '0.9em',
+                    backgroundColor: '#2a2a2a',
+                    color: '#bbb',
+                    border: '1px solid #444',
+                    borderRadius: '999px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  ↺
+                </button>
+              </div>
+              <div style={{ fontSize: '2em', fontWeight: 700, marginBottom: '10px' }}>{formatStopwatchTime(sectionStopwatchSeconds)}</div>
+              <button
+                onClick={() => setSectionStopwatchRunning(prev => !prev)}
+                style={{
+                  width: '100%',
+                  padding: '0.8em 1em',
+                  fontSize: '1em',
+                  backgroundColor: sectionStopwatchRunning ? '#8bc34a' : '#2a2a2a',
+                  color: sectionStopwatchRunning ? '#111' : '#fff',
+                  border: '1px solid #444',
+                  borderRadius: '8px',
+                  cursor: 'pointer'
+                }}
+              >
+                {sectionStopwatchRunning ? 'Pause' : 'Start'}
+              </button>
+            </div>
+            <button
+              onClick={() => setSectionRoundCount(prev => prev + 1)}
+              style={{
+                backgroundColor: '#1d2a44',
+                border: '1px solid #3f5ea8',
+                borderRadius: '10px',
+                padding: '16px',
+                color: '#fff',
+                textAlign: 'left',
+                cursor: 'pointer'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                <div style={{ color: '#9fb3ff', fontSize: '0.85em' }}>Rounds</div>
+                <span
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setSectionRoundCount(0);
+                  }}
+                  role="button"
+                  title="Reset rounds"
+                  aria-label="Reset rounds"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '999px',
+                    border: '1px solid #3f5ea8',
+                    color: '#c9d5ff',
+                    fontSize: '0.95em'
+                  }}
+                >
+                  ↺
+                </span>
+              </div>
+              <div style={{ fontSize: '2.8em', fontWeight: 700 }}>{sectionRoundCount}</div>
+              <div style={{ marginTop: '8px', color: '#c9d5ff', fontSize: '0.9em' }}>Tap this card to add one round</div>
+            </button>
+          </div>
+
+          <div>
+            {focusedSectionExercises.map((exercise, exerciseIndex) => (
+              <div
+                key={`${focusedSectionName}-${exerciseIndex}`}
+                style={{
+                  marginBottom: '12px',
+                  padding: '14px',
+                  backgroundColor: '#1a1a1a',
+                  borderRadius: '8px',
+                  border: '1px solid #333'
+                }}
+              >
+                {Object.entries(exercise).map(([key, value]) => {
+                  if (key.startsWith('__')) return null;
+                  if (key === 'Date' || key === 'Section' || key === 'Section Prescription' || key === 'Day' || key === 'Section Score') return null;
+                  if (!value && key !== 'Notes') return null;
+
+                  if (key === 'Exercise') {
+                    return <div key={key} style={{ fontSize: '1.15em', fontWeight: 700, marginBottom: '8px' }}>{value}</div>;
+                  }
+
+                  if (key === 'Notes') {
+                    return value ? <div key={key} style={{ color: '#aaa', fontStyle: 'italic' }}>{value}</div> : null;
+                  }
+
+                  return <div key={key} style={{ marginBottom: '4px', color: '#ddd' }}>{value}</div>;
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -904,15 +1098,39 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
 
                     return (
                       <div key={sectionName} style={{ marginBottom: '20px' }}>
-                        <h4 style={{
-                          fontSize: '1.1em',
-                          marginBottom: '5px',
-                          color: '#8bc34a',
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          gap: '10px',
                           borderBottom: '1px solid #444',
-                          paddingBottom: '5px'
+                          paddingBottom: '5px',
+                          marginBottom: '5px'
                         }}>
-                          {sectionName}
-                        </h4>
+                          <h4 style={{
+                            fontSize: '1.1em',
+                            margin: 0,
+                            color: '#8bc34a'
+                          }}>
+                            {sectionName}
+                          </h4>
+                          <button
+                            onClick={() => openFocusedSection(sectionName, sectionPrescription, exercises)}
+                            title={`Focus ${sectionName}`}
+                            aria-label={`Focus ${sectionName}`}
+                            style={{
+                              padding: '4px 10px',
+                              fontSize: '0.9em',
+                              backgroundColor: '#333',
+                              color: '#fff',
+                              border: '1px solid #444',
+                              borderRadius: '6px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            ▶
+                          </button>
+                        </div>
                         {sectionPrescription && (
                           <p style={{
                             fontSize: '0.9em',

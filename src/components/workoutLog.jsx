@@ -120,6 +120,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
   const [viewMode, setViewMode] = useState('week'); // 'week' or 'month'
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [weekDragOffset, setWeekDragOffset] = useState(0);
+  const [weekSlideTransition, setWeekSlideTransition] = useState('transform 0.18s ease-out');
   const weekDragStateRef = useRef({
     pointerId: null,
     startX: 0,
@@ -201,6 +202,27 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
     });
   };
 
+  const animateWeekShift = (days, direction) => {
+    const offscreenOffset = direction === 'next' ? -220 : 220;
+    const incomingOffset = direction === 'next' ? 220 : -220;
+
+    setWeekSlideTransition('transform 0.22s ease-out');
+    setWeekDragOffset(offscreenOffset);
+
+    window.setTimeout(() => {
+      shiftSelectedDateByDays(days);
+      setWeekSlideTransition('none');
+      setWeekDragOffset(incomingOffset);
+
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          setWeekSlideTransition('transform 0.22s ease-out');
+          setWeekDragOffset(0);
+        });
+      });
+    }, 220);
+  };
+
   const handleWeekPointerDown = (event) => {
     if (viewMode !== 'week') return;
     weekDragStateRef.current = {
@@ -224,20 +246,21 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
         return;
       }
       state.dragging = true;
+      setWeekSlideTransition('none');
     }
 
-    setWeekDragOffset(Math.max(-72, Math.min(72, deltaX * 0.35)));
+    setWeekDragOffset(Math.max(-120, Math.min(120, deltaX * 0.65)));
 
-    if (Math.abs(deltaX) >= 50) {
-      shiftSelectedDateByDays(deltaX > 0 ? -7 : 7);
+    if (Math.abs(deltaX) >= 70) {
       state.navigated = true;
-      setWeekDragOffset(0);
+      animateWeekShift(deltaX > 0 ? -7 : 7, deltaX > 0 ? 'prev' : 'next');
     }
   };
 
   const resetWeekPointerState = (event) => {
     const state = weekDragStateRef.current;
     if (event && state.pointerId !== event.pointerId) return;
+    setWeekSlideTransition('transform 0.18s ease-out');
     setWeekDragOffset(0);
     weekDragStateRef.current = {
       pointerId: null,
@@ -799,7 +822,8 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
               touchAction: 'pan-y',
               userSelect: 'none',
               transform: `translateX(${weekDragOffset}px)`,
-              transition: weekDragStateRef.current.dragging ? 'none' : 'transform 0.18s ease-out'
+              transition: weekSlideTransition,
+              willChange: 'transform'
             }}
           >
             {weekDates.map((date, index) => {

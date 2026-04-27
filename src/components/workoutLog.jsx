@@ -202,12 +202,18 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
     });
   };
 
-  const animateWeekShift = (days, direction) => {
+  const animateWeekShift = (days, direction, currentOffset = 0) => {
     const offscreenOffset = direction === 'next' ? -220 : 220;
     const incomingOffset = direction === 'next' ? 220 : -220;
 
     setWeekSlideTransition('transform 0.22s ease-out');
-    setWeekDragOffset(offscreenOffset);
+    setWeekDragOffset(currentOffset);
+
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        setWeekDragOffset(offscreenOffset);
+      });
+    });
 
     window.setTimeout(() => {
       shiftSelectedDateByDays(days);
@@ -253,7 +259,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
 
     if (Math.abs(deltaX) >= 70) {
       state.navigated = true;
-      animateWeekShift(deltaX > 0 ? -7 : 7, deltaX > 0 ? 'prev' : 'next');
+      animateWeekShift(deltaX > 0 ? -7 : 7, deltaX > 0 ? 'prev' : 'next', Math.max(-120, Math.min(120, deltaX * 0.65)));
     }
   };
 

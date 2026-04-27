@@ -855,15 +855,15 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
             <div
               onClick={() => setSectionStopwatchRunning(prev => !prev)}
               style={{
-                backgroundColor: '#1a1a1a',
-                border: '1px solid #333',
+                backgroundColor: sectionStopwatchRunning ? '#b9e97c' : '#1a1a1a',
+                border: `1px solid ${sectionStopwatchRunning ? '#b9e97c' : '#333'}`,
                 borderRadius: '10px',
                 padding: '14px',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                color: sectionStopwatchRunning ? '#111' : '#fff'
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-                <div style={{ color: '#999', fontSize: '0.8em' }}>Stopwatch</div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '4px' }}>
                 <span
                   onClick={(event) => {
                     event.stopPropagation();
@@ -880,8 +880,8 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                     width: '28px',
                     height: '28px',
                     borderRadius: '999px',
-                    border: '1px solid #444',
-                    color: '#bbb',
+                    border: `1px solid ${sectionStopwatchRunning ? '#86b85f' : '#444'}`,
+                    color: sectionStopwatchRunning ? '#335214' : '#bbb',
                     fontSize: '0.95em'
                   }}
                 >
@@ -889,9 +889,6 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                 </span>
               </div>
               <div style={{ fontSize: '2.1em', fontWeight: 700 }}>{formatStopwatchTime(sectionStopwatchSeconds)}</div>
-              <div style={{ marginTop: '4px', color: sectionStopwatchRunning ? '#8bc34a' : '#888', fontSize: '0.8em' }}>
-                {sectionStopwatchRunning ? 'Running' : 'Stopped'}
-              </div>
             </div>
             <button
               onClick={() => setSectionRoundCount(prev => prev + 1)}
@@ -905,8 +902,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                 cursor: 'pointer'
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-                <div style={{ color: '#9fb3ff', fontSize: '0.8em' }}>Rounds</div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '4px' }}>
                 <span
                   onClick={(event) => {
                     event.stopPropagation();

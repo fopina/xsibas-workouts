@@ -119,6 +119,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
   const [weekDates, setWeekDates] = useState([]);
   const [viewMode, setViewMode] = useState('week'); // 'week' or 'month'
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [weekDragOffset, setWeekDragOffset] = useState(0);
   const weekDragStateRef = useRef({
     pointerId: null,
     startX: 0,
@@ -225,15 +226,19 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
       state.dragging = true;
     }
 
+    setWeekDragOffset(Math.max(-72, Math.min(72, deltaX * 0.35)));
+
     if (Math.abs(deltaX) >= 50) {
       shiftSelectedDateByDays(deltaX > 0 ? -7 : 7);
       state.navigated = true;
+      setWeekDragOffset(0);
     }
   };
 
   const resetWeekPointerState = (event) => {
     const state = weekDragStateRef.current;
     if (event && state.pointerId !== event.pointerId) return;
+    setWeekDragOffset(0);
     weekDragStateRef.current = {
       pointerId: null,
       startX: 0,
@@ -777,6 +782,9 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
       {viewMode === 'week' ? (
         // Week View
         <div>
+          <div style={{ marginBottom: '8px', fontSize: '0.8em', color: '#888', textAlign: 'center' }}>
+            Drag left or right to switch weeks
+          </div>
           <div
             onPointerDown={handleWeekPointerDown}
             onPointerMove={handleWeekPointerMove}
@@ -789,7 +797,9 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
               marginBottom: '20px',
               width: '100%',
               touchAction: 'pan-y',
-              userSelect: 'none'
+              userSelect: 'none',
+              transform: `translateX(${weekDragOffset}px)`,
+              transition: weekDragStateRef.current.dragging ? 'none' : 'transform 0.18s ease-out'
             }}
           >
             {weekDates.map((date, index) => {

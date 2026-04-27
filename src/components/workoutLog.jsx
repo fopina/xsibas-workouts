@@ -850,47 +850,48 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
             gap: '12px',
-            marginBottom: '24px'
+            marginBottom: '20px'
           }}>
-            <div style={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '10px', padding: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-                <div style={{ color: '#999', fontSize: '0.85em' }}>Stopwatch</div>
-                <button
-                  onClick={() => {
+            <div
+              onClick={() => setSectionStopwatchRunning(prev => !prev)}
+              style={{
+                backgroundColor: '#1a1a1a',
+                border: '1px solid #333',
+                borderRadius: '10px',
+                padding: '14px',
+                cursor: 'pointer'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+                <div style={{ color: '#999', fontSize: '0.8em' }}>Stopwatch</div>
+                <span
+                  onClick={(event) => {
+                    event.stopPropagation();
                     setSectionStopwatchRunning(false);
                     setSectionStopwatchSeconds(0);
                   }}
+                  role="button"
                   title="Reset timer"
                   aria-label="Reset timer"
                   style={{
-                    padding: '2px 8px',
-                    fontSize: '0.9em',
-                    backgroundColor: '#2a2a2a',
-                    color: '#bbb',
-                    border: '1px solid #444',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '28px',
+                    height: '28px',
                     borderRadius: '999px',
-                    cursor: 'pointer'
+                    border: '1px solid #444',
+                    color: '#bbb',
+                    fontSize: '0.95em'
                   }}
                 >
                   ↺
-                </button>
+                </span>
               </div>
-              <div style={{ fontSize: '2em', fontWeight: 700, marginBottom: '10px' }}>{formatStopwatchTime(sectionStopwatchSeconds)}</div>
-              <button
-                onClick={() => setSectionStopwatchRunning(prev => !prev)}
-                style={{
-                  width: '100%',
-                  padding: '0.8em 1em',
-                  fontSize: '1em',
-                  backgroundColor: sectionStopwatchRunning ? '#8bc34a' : '#2a2a2a',
-                  color: sectionStopwatchRunning ? '#111' : '#fff',
-                  border: '1px solid #444',
-                  borderRadius: '8px',
-                  cursor: 'pointer'
-                }}
-              >
-                {sectionStopwatchRunning ? 'Pause' : 'Start'}
-              </button>
+              <div style={{ fontSize: '2.1em', fontWeight: 700 }}>{formatStopwatchTime(sectionStopwatchSeconds)}</div>
+              <div style={{ marginTop: '4px', color: sectionStopwatchRunning ? '#8bc34a' : '#888', fontSize: '0.8em' }}>
+                {sectionStopwatchRunning ? 'Running' : 'Stopped'}
+              </div>
             </div>
             <button
               onClick={() => setSectionRoundCount(prev => prev + 1)}
@@ -898,14 +899,14 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                 backgroundColor: '#1d2a44',
                 border: '1px solid #3f5ea8',
                 borderRadius: '10px',
-                padding: '16px',
+                padding: '14px',
                 color: '#fff',
                 textAlign: 'left',
                 cursor: 'pointer'
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-                <div style={{ color: '#9fb3ff', fontSize: '0.85em' }}>Rounds</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+                <div style={{ color: '#9fb3ff', fontSize: '0.8em' }}>Rounds</div>
                 <span
                   onClick={(event) => {
                     event.stopPropagation();
@@ -930,7 +931,6 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                 </span>
               </div>
               <div style={{ fontSize: '2.8em', fontWeight: 700 }}>{sectionRoundCount}</div>
-              <div style={{ marginTop: '8px', color: '#c9d5ff', fontSize: '0.9em' }}>Tap this card to add one round</div>
             </button>
           </div>
 

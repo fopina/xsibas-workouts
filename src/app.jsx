@@ -693,43 +693,15 @@ export function App() {
                       justifyContent: 'center'
                     }}
                   >
-                    <span style={{
-                      position: 'relative',
-                      width: '18px',
-                      height: '18px',
-                      display: 'inline-block'
-                    }}>
-                      <span style={{
-                        position: 'absolute',
-                        left: '2px',
-                        right: '2px',
-                        bottom: '1px',
-                        height: '11px',
-                        border: '2px solid currentColor',
-                        borderTop: 'none',
-                        borderRadius: '0 0 6px 6px'
-                      }} />
-                      <span style={{
-                        position: 'absolute',
-                        left: '8px',
-                        top: '0px',
-                        width: '2px',
-                        height: '11px',
-                        backgroundColor: 'currentColor',
-                        borderRadius: '999px'
-                      }} />
-                      <span style={{
-                        position: 'absolute',
-                        left: '5px',
-                        top: '0px',
-                        width: '8px',
-                        height: '8px',
-                        borderTop: '2px solid currentColor',
-                        borderLeft: '2px solid currentColor',
-                        transform: 'rotate(45deg)',
-                        transformOrigin: 'center'
-                      }} />
-                    </span>
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 512 512"
+                      width="16"
+                      height="16"
+                      fill="currentColor"
+                    >
+                      <path d="M307 34.8c-11.5 5.1-19 16.6-19 29.2l0 80-144 0C64.5 144 0 208.5 0 288l0 64c0 79.5 64.5 144 144 144l224 0c79.5 0 144-64.5 144-144l0-64c0-79.5-64.5-144-144-144l-144 0 0-80c0-12.6-7.5-24.1-19-29.2s-24.8-2.9-34 5.5l-144 128c-6.8 6.1-11 14.9-11 24.1s4.1 18 11 24.1l144 128c9.2 8.3 22.5 10.6 34 5.5s19-16.6 19-29.2l0-80 144 0c26.5 0 48 21.5 48 48l0 64c0 26.5-21.5 48-48 48l-224 0c-26.5 0-48-21.5-48-48l0-64c0-26.5 21.5-48 48-48l144 0 0 80c0 12.6 7.5 24.1 19 29.2s24.8 2.9 34-5.5l144-128c6.8-6.1 11-14.9 11-24.1s-4.1-18-11-24.1l-144-128c-9.2-8.3-22.5-10.6-34-5.5z" />
+                    </svg>
                   </button>
                 )}
                 <div ref={topMenuRef} style={{ position: 'relative' }}>

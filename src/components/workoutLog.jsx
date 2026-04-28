@@ -3,6 +3,7 @@ import { validateSpreadsheetSchema, formatValidationErrors } from '../utils/sche
 
 // We access gapi via the window object, as it's loaded from a script tag.
 const gapi = window.gapi;
+const SECTION_FOCUS_STATS_KEY = 'workout_section_focus_stats';
 
 const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, onSessionExpired }) => {
   const [workouts, setWorkouts] = useState([]);
@@ -127,6 +128,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
   const [sectionStopwatchSeconds, setSectionStopwatchSeconds] = useState(0);
   const [sectionStopwatchRunning, setSectionStopwatchRunning] = useState(false);
   const [sectionRoundCount, setSectionRoundCount] = useState(0);
+  const [sectionFocusStats, setSectionFocusStats] = useState({});
   const weekDragStateRef = useRef({
     pointerId: null,
     startX: 0,
@@ -144,6 +146,27 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
 
     return () => window.clearInterval(intervalId);
   }, [sectionStopwatchRunning]);
+
+  const getSectionFocusStatsKey = (date, sectionName) => `${toDateKey(date)}::${sectionName}`;
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(SECTION_FOCUS_STATS_KEY);
+      if (raw) {
+        setSectionFocusStats(JSON.parse(raw));
+      }
+    } catch (err) {
+      console.error('Error loading section focus stats:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SECTION_FOCUS_STATS_KEY, JSON.stringify(sectionFocusStats));
+    } catch (err) {
+      console.error('Error saving section focus stats:', err);
+    }
+  }, [sectionFocusStats]);
 
   const toggleVideo = (exerciseKey) => {
     setExpandedVideos(prev => ({
@@ -218,15 +241,29 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
   };
 
   const openFocusedSection = (sectionName, sectionPrescription, exercises) => {
+    const statsKey = getSectionFocusStatsKey(selectedDate, sectionName);
+    const savedStats = sectionFocusStats[statsKey] || { stopwatchSeconds: 0, roundCount: 0 };
+
     setFocusedSectionName(sectionName);
     setFocusedSectionPrescription(sectionPrescription || '');
     setFocusedSectionExercises(exercises);
-    setSectionStopwatchSeconds(0);
+    setSectionStopwatchSeconds(savedStats.stopwatchSeconds || 0);
     setSectionStopwatchRunning(false);
-    setSectionRoundCount(0);
+    setSectionRoundCount(savedStats.roundCount || 0);
   };
 
   const closeFocusedSection = () => {
+    if (focusedSectionName) {
+      const statsKey = getSectionFocusStatsKey(selectedDate, focusedSectionName);
+      setSectionFocusStats(prev => ({
+        ...prev,
+        [statsKey]: {
+          stopwatchSeconds: sectionStopwatchSeconds,
+          roundCount: sectionRoundCount,
+        }
+      }));
+    }
+
     setFocusedSectionName(null);
     setFocusedSectionPrescription('');
     setFocusedSectionExercises([]);
@@ -1129,15 +1166,24 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                             ▶
                           </button>
                         </div>
-                        {sectionPrescription && (
-                          <p style={{
-                            fontSize: '0.9em',
-                            color: '#aaa',
-                            marginBottom: '10px',
-                            fontStyle: 'italic'
-                          }}>
-                            {sectionPrescription}
-                          </p>
+                        {(sectionPrescription || sectionFocusStats[getSectionFocusStatsKey(selectedDate, sectionName)]) && (
+                          <div style={{ marginBottom: '10px' }}>
+                            {sectionPrescription && (
+                              <p style={{
+                                fontSize: '0.9em',
+                                color: '#aaa',
+                                marginBottom: '4px',
+                                fontStyle: 'italic'
+                              }}>
+                                {sectionPrescription}
+                              </p>
+                            )}
+                            {sectionFocusStats[getSectionFocusStatsKey(selectedDate, sectionName)] && (
+                              <div style={{ fontSize: '0.82em', color: '#8aa0c8' }}>
+                                {formatStopwatchTime(sectionFocusStats[getSectionFocusStatsKey(selectedDate, sectionName)].stopwatchSeconds || 0)} • {sectionFocusStats[getSectionFocusStatsKey(selectedDate, sectionName)].roundCount || 0} rounds
+                              </div>
+                            )}
+                          </div>
                         )}
                         {exercises.map((exercise, exerciseIndex) => {
                           const videoLink = exerciseVideoMap[exercise.Exercise];

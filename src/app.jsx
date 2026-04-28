@@ -693,7 +693,43 @@ export function App() {
                       justifyContent: 'center'
                     }}
                   >
-                    ↗
+                    <span style={{
+                      position: 'relative',
+                      width: '18px',
+                      height: '18px',
+                      display: 'inline-block'
+                    }}>
+                      <span style={{
+                        position: 'absolute',
+                        left: '2px',
+                        right: '2px',
+                        bottom: '1px',
+                        height: '11px',
+                        border: '2px solid currentColor',
+                        borderTop: 'none',
+                        borderRadius: '0 0 6px 6px'
+                      }} />
+                      <span style={{
+                        position: 'absolute',
+                        left: '8px',
+                        top: '0px',
+                        width: '2px',
+                        height: '11px',
+                        backgroundColor: 'currentColor',
+                        borderRadius: '999px'
+                      }} />
+                      <span style={{
+                        position: 'absolute',
+                        left: '5px',
+                        top: '0px',
+                        width: '8px',
+                        height: '8px',
+                        borderTop: '2px solid currentColor',
+                        borderLeft: '2px solid currentColor',
+                        transform: 'rotate(45deg)',
+                        transformOrigin: 'center'
+                      }} />
+                    </span>
                   </button>
                 )}
                 <div ref={topMenuRef} style={{ position: 'relative' }}>

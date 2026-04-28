@@ -1257,6 +1257,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                           const showVideo = expandedVideos[exerciseKey];
                           const notesValue = exercise.Notes || '';
                           const sectionScoreValue = exercise['Section Score'] || '';
+                          const parsedSectionScore = getSectionAutoStats(sectionScoreValue);
                           const isEditingSectionScore = exerciseKey in editingSectionScores;
                           const isSavingSectionScore = exerciseKey in savingSectionScores;
                           const canEditSectionScore = !!accessToken;
@@ -1337,7 +1338,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                                               <button
                                                 onClick={() => setEditingSectionScores(prev => ({
                                                   ...prev,
-                                                  [exerciseKey]: sectionScoreValue
+                                                  [exerciseKey]: parsedSectionScore.manualText
                                                 }))}
                                                 title={sectionScoreValue ? 'Edit section score' : 'Add section score'}
                                                 aria-label={sectionScoreValue ? 'Edit section score' : 'Add section score'}
@@ -1466,7 +1467,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                                           />
                                           <div style={{ marginTop: '5px', display: 'flex', gap: '5px' }}>
                                             <button
-                                              onClick={() => updateSectionScore(sheetRowNumber, editingSectionScores[exerciseKey] || '', exerciseKey)}
+                                              onClick={() => updateSectionScore(sheetRowNumber, buildSectionScoreValue(editingSectionScores[exerciseKey] || '', parsedSectionScore.timer, parsedSectionScore.rounds), exerciseKey)}
                                               disabled={isSavingSectionScore}
                                               style={{
                                                 padding: '5px 10px',
@@ -1504,12 +1505,12 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                                         </div>
                                       ) : (
                                         <div style={{ marginTop: '5px' }}>
-                                          {sectionScoreValue && (
+                                          {parsedSectionScore.manualText && (
                                             <div style={{
                                               color: '#aaa',
                                               marginBottom: '4px'
                                             }}>
-                                              🕒 {sectionScoreValue}
+                                              🕒 {parsedSectionScore.manualText}
                                             </div>
                                           )}
                                         </div>

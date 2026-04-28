@@ -675,61 +675,63 @@ export function App() {
                 }}
               />
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <button
-                  onClick={shareCurrentUrl}
-                  aria-label="Share"
-                  title="Share"
-                  style={{
-                    width: '36px',
-                    height: '36px',
-                    padding: 0,
-                    fontSize: '1.05em',
-                    backgroundColor: '#333',
-                    border: '1px solid #555',
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <span style={{
-                    position: 'relative',
-                    width: '18px',
-                    height: '18px',
-                    display: 'inline-block'
-                  }}>
+                {isStandalonePwa && (
+                  <button
+                    onClick={shareCurrentUrl}
+                    aria-label="Share"
+                    title="Share"
+                    style={{
+                      width: '36px',
+                      height: '36px',
+                      padding: 0,
+                      fontSize: '1.05em',
+                      backgroundColor: '#333',
+                      border: '1px solid #555',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
                     <span style={{
-                      position: 'absolute',
-                      left: '2px',
-                      right: '2px',
-                      bottom: '1px',
-                      height: '11px',
-                      border: '2px solid currentColor',
-                      borderTop: 'none',
-                      borderRadius: '0 0 6px 6px'
-                    }} />
-                    <span style={{
-                      position: 'absolute',
-                      left: '8px',
-                      top: '0px',
-                      width: '2px',
-                      height: '11px',
-                      backgroundColor: 'currentColor',
-                      borderRadius: '999px'
-                    }} />
-                    <span style={{
-                      position: 'absolute',
-                      left: '5px',
-                      top: '0px',
-                      width: '8px',
-                      height: '8px',
-                      borderTop: '2px solid currentColor',
-                      borderLeft: '2px solid currentColor',
-                      transform: 'rotate(45deg)',
-                      transformOrigin: 'center'
-                    }} />
-                  </span>
-                </button>
+                      position: 'relative',
+                      width: '18px',
+                      height: '18px',
+                      display: 'inline-block'
+                    }}>
+                      <span style={{
+                        position: 'absolute',
+                        left: '2px',
+                        right: '2px',
+                        bottom: '1px',
+                        height: '11px',
+                        border: '2px solid currentColor',
+                        borderTop: 'none',
+                        borderRadius: '0 0 6px 6px'
+                      }} />
+                      <span style={{
+                        position: 'absolute',
+                        left: '8px',
+                        top: '0px',
+                        width: '2px',
+                        height: '11px',
+                        backgroundColor: 'currentColor',
+                        borderRadius: '999px'
+                      }} />
+                      <span style={{
+                        position: 'absolute',
+                        left: '5px',
+                        top: '0px',
+                        width: '8px',
+                        height: '8px',
+                        borderTop: '2px solid currentColor',
+                        borderLeft: '2px solid currentColor',
+                        transform: 'rotate(45deg)',
+                        transformOrigin: 'center'
+                      }} />
+                    </span>
+                  </button>
+                )}
                 <div ref={topMenuRef} style={{ position: 'relative' }}>
                   <button
                     onClick={() => setTopMenuOpen(prev => !prev)}

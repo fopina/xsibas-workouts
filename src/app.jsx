@@ -693,7 +693,21 @@ export function App() {
                       justifyContent: 'center'
                     }}
                   >
-                    ↗
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      width="18"
+                      height="18"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M12 15V4" />
+                      <path d="M8.5 7.5 12 4l3.5 3.5" />
+                      <path d="M7 10.5H6a2 2 0 0 0-2 2V18a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5.5a2 2 0 0 0-2-2h-1" />
+                    </svg>
                   </button>
                 )}
                 <div ref={topMenuRef} style={{ position: 'relative' }}>

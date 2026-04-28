@@ -84,7 +84,7 @@ const Auth = ({ accessToken, onAuthChange, onUserNameChange, onReadyStateChange,
       clearInterval(checkGisReady);
       if (onReadyStateChange) onReadyStateChange(false);
     };
-  }, [onAuthChange, onReadyStateChange, onUserNameChange]);
+  }, []);
 
   const handleLogin = () => {
     console.log('Login button clicked');

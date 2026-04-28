@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import Auth from './components/auth';
 import WorkoutLog from './components/workoutLog';
 import Landing from './components/landing';
@@ -23,6 +23,10 @@ export function App() {
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [isStandalonePwa, setIsStandalonePwa] = useState(false);
   const [shareMessage, setShareMessage] = useState('');
+  const [authUserName, setAuthUserName] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [topMenuOpen, setTopMenuOpen] = useState(false);
+  const topMenuRef = useRef(null);
 
   // Simple router: keep state in sync for popstate + pushState/replaceState.
   useEffect(() => {
@@ -78,6 +82,22 @@ export function App() {
     window.history.pushState({}, '', path);
     setCurrentPath(getCurrentRoute());
   };
+
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (topMenuRef.current && !topMenuRef.current.contains(event.target)) {
+        setTopMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('touchstart', handleOutsideClick);
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('touchstart', handleOutsideClick);
+    };
+  }, []);
 
   // Detect if running as standalone PWA
   useEffect(() => {
@@ -633,51 +653,143 @@ export function App() {
   // Show main app for /workout path
   return (
     <div class="app-container">
-      <header>
-        <img
-          src="/xsibas300.png"
-          alt="Workout Planner"
-          onClick={() => navigate('/')}
-          style={{
-            height: '40px',
-            width: 'auto',
-            objectFit: 'contain',
-            cursor: 'pointer'
-          }}
-        />
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          {isStandalonePwa && (
-            <button
-              onClick={shareCurrentUrl}
-              style={{
-                padding: '0.4em 0.7em',
-                fontSize: '0.8em',
-                backgroundColor: '#333',
-                border: '1px solid #555',
-                cursor: 'pointer'
-              }}
-            >
-              Share
-            </button>
-          )}
-          {sheetId && (
-            <button
-              onClick={() => setShowSheetSelector(true)}
-              style={{
-                padding: '0.5em 1em',
-                fontSize: '0.9em',
-                backgroundColor: '#333',
-                border: '1px solid #555',
-                cursor: 'pointer'
-              }}
-            >
-              Sheet
-            </button>
-          )}
-          <Auth accessToken={accessToken} onAuthChange={handleAuthChange} forceLogoutVersion={forceLogoutVersion} />
-        </div>
-      </header>
-      <main>
+      <Auth
+        accessToken={accessToken}
+        onAuthChange={handleAuthChange}
+        onUserNameChange={setAuthUserName}
+        onReadyStateChange={setAuthReady}
+        forceLogoutVersion={forceLogoutVersion}
+      >
+        {({ accessToken: authToken, userName, login, logout }) => (
+          <>
+            <header>
+              <img
+                src="/xsibas300.png"
+                alt="Workout Planner"
+                onClick={() => navigate('/')}
+                style={{
+                  height: '40px',
+                  width: 'auto',
+                  objectFit: 'contain',
+                  cursor: 'pointer'
+                }}
+              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {isStandalonePwa && (
+                  <button
+                    onClick={shareCurrentUrl}
+                    aria-label="Share"
+                    title="Share"
+                    style={{
+                      width: '36px',
+                      height: '36px',
+                      padding: 0,
+                      fontSize: '1.05em',
+                      backgroundColor: '#333',
+                      border: '1px solid #555',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    ↗
+                  </button>
+                )}
+                <div ref={topMenuRef} style={{ position: 'relative' }}>
+                  <button
+                    onClick={() => setTopMenuOpen(prev => !prev)}
+                    aria-haspopup="menu"
+                    aria-expanded={topMenuOpen}
+                    style={{
+                      padding: '0.5em 0.9em',
+                      fontSize: '0.9em',
+                      backgroundColor: '#333',
+                      border: '1px solid #555',
+                      cursor: 'pointer',
+                      minWidth: '96px'
+                    }}
+                  >
+                    {userName || authUserName || 'Guest'} ▾
+                  </button>
+                  {topMenuOpen && (
+                    <div
+                      role="menu"
+                      style={{
+                        position: 'absolute',
+                        top: 'calc(100% + 6px)',
+                        right: 0,
+                        minWidth: '180px',
+                        backgroundColor: '#1a1a1a',
+                        border: '1px solid #444',
+                        borderRadius: '8px',
+                        boxShadow: '0 10px 24px rgba(0, 0, 0, 0.35)',
+                        padding: '6px',
+                        zIndex: 50
+                      }}
+                    >
+                      <div style={{
+                        padding: '0.55em 0.7em',
+                        fontSize: '0.8em',
+                        color: authToken ? '#8bc34a' : '#999',
+                        borderBottom: '1px solid #333',
+                        marginBottom: '6px'
+                      }}>
+                        {userName || authUserName || 'Guest'}
+                      </div>
+                      {sheetId && (
+                        <button
+                          role="menuitem"
+                          onClick={() => {
+                            setTopMenuOpen(false);
+                            setShowSheetSelector(true);
+                          }}
+                          style={{
+                            width: '100%',
+                            textAlign: 'left',
+                            padding: '0.65em 0.7em',
+                            fontSize: '0.9em',
+                            backgroundColor: 'transparent',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Sheets
+                        </button>
+                      )}
+                      <button
+                        role="menuitem"
+                        onClick={() => {
+                          setTopMenuOpen(false);
+                          if (authToken) {
+                            logout();
+                          } else {
+                            login();
+                          }
+                        }}
+                        disabled={!authToken && !authReady}
+                        style={{
+                          width: '100%',
+                          textAlign: 'left',
+                          padding: '0.65em 0.7em',
+                          fontSize: '0.9em',
+                          backgroundColor: 'transparent',
+                          color: !authToken && !authReady ? '#666' : '#fff',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: !authToken && !authReady ? 'default' : 'pointer'
+                        }}
+                      >
+                        {authToken ? 'Log Out' : 'Log In'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </header>
+            <main>
         {shareMessage && (
           <div style={{
             backgroundColor: '#1a2a1a',
@@ -860,17 +972,20 @@ export function App() {
             <div>Loading Google API client...</div>
           </div>
         )}
-      </main>
-      <footer style={{
-        textAlign: 'center',
-        padding: '1em',
-        fontSize: '0.9em',
-        color: '#666'
-      }}>
-        <a href="/privacy/" style={{ color: '#8bc34a', textDecoration: 'none' }}>
-          Privacy Policy
-        </a>
-      </footer>
+            </main>
+            <footer style={{
+              textAlign: 'center',
+              padding: '1em',
+              fontSize: '0.9em',
+              color: '#666'
+            }}>
+              <a href="/privacy/" style={{ color: '#8bc34a', textDecoration: 'none' }}>
+                Privacy Policy
+              </a>
+            </footer>
+          </>
+        )}
+      </Auth>
     </div>
   );
 }

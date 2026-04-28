@@ -4,12 +4,13 @@ const STORAGE_KEY = 'google_access_token';
 const USER_NAME_KEY = 'google_user_name';
 const USER_EMAIL_KEY = 'google_user_email';
 
-const Auth = ({ accessToken, onAuthChange, forceLogoutVersion = 0 }) => {
+const Auth = ({ accessToken, onAuthChange, onUserNameChange, onReadyStateChange, children, forceLogoutVersion = 0 }) => {
   const [tokenClient, setTokenClient] = useState(null);
   const [userName, setUserName] = useState(null);
 
   const clearAuthState = ({ clearStoredEmail = false } = {}) => {
     setUserName(null);
+    if (onUserNameChange) onUserNameChange(null);
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(USER_NAME_KEY);
     if (clearStoredEmail) {
@@ -26,6 +27,7 @@ const Auth = ({ accessToken, onAuthChange, forceLogoutVersion = 0 }) => {
       onAuthChange(storedToken);
       if (storedUserName) {
         setUserName(storedUserName);
+        if (onUserNameChange) onUserNameChange(storedUserName);
       }
     }
   }, []);
@@ -53,6 +55,7 @@ const Auth = ({ accessToken, onAuthChange, forceLogoutVersion = 0 }) => {
                 const userInfo = await userInfoResponse.json();
                 if (userInfo.name) {
                   setUserName(userInfo.name);
+                  if (onUserNameChange) onUserNameChange(userInfo.name);
                   localStorage.setItem(USER_NAME_KEY, userInfo.name);
                 }
                 if (userInfo.email) {
@@ -65,6 +68,7 @@ const Auth = ({ accessToken, onAuthChange, forceLogoutVersion = 0 }) => {
           },
         });
         setTokenClient(client);
+        if (onReadyStateChange) onReadyStateChange(true);
         console.log('Token client initialized');
       }
     };
@@ -76,8 +80,11 @@ const Auth = ({ accessToken, onAuthChange, forceLogoutVersion = 0 }) => {
       }
     }, 100);
 
-    return () => clearInterval(checkGisReady);
-  }, [onAuthChange]);
+    return () => {
+      clearInterval(checkGisReady);
+      if (onReadyStateChange) onReadyStateChange(false);
+    };
+  }, [onAuthChange, onReadyStateChange, onUserNameChange]);
 
   const handleLogin = () => {
     console.log('Login button clicked');
@@ -106,30 +113,13 @@ const Auth = ({ accessToken, onAuthChange, forceLogoutVersion = 0 }) => {
     clearAuthState({ clearStoredEmail: false });
   }, [forceLogoutVersion]);
 
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-      {!accessToken ? (
-        <>
-          <span style={{ fontSize: '0.85em', color: '#888' }}>
-            Viewing anonymously
-          </span>
-          <button onClick={handleLogin}>Log In</button>
-        </>
-      ) : (
-        <>
-          <span style={{ fontSize: '0.85em', color: '#8bc34a' }}>
-            {userName || 'Logged in'}
-          </span>
-          <button
-            onClick={handleLogout}
-            style={{ fontSize: '0.85em', padding: '0.4em 0.8em' }}
-          >
-            Log Out
-          </button>
-        </>
-      )}
-    </div>
-  );
+  return children({
+    accessToken,
+    userName,
+    isReady: !!tokenClient,
+    login: handleLogin,
+    logout: handleLogout,
+  });
 };
 
 export default Auth;

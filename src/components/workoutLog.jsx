@@ -1,5 +1,11 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
 import { validateSpreadsheetSchema, formatValidationErrors } from '../utils/schemaValidator';
+import {
+  getSectionAutoStats,
+  buildSectionScoreValue,
+  formatStopwatchTime,
+  parseStopwatchTimeToSeconds,
+} from '../utils/sectionScore';
 
 // We access gapi via the window object, as it's loaded from a script tag.
 const gapi = window.gapi;
@@ -145,25 +151,6 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
     return () => window.clearInterval(intervalId);
   }, [sectionStopwatchRunning]);
 
-  const getSectionAutoStats = (sectionScoreValue = '') => {
-    const match = sectionScoreValue.match(/\[auto:\s*(\d{2}:\d{2}(?::\d{2})?)\s*\/\s*(\d+)\]$/);
-    if (!match) {
-      return { timer: '', rounds: 0, manualText: sectionScoreValue.trim() };
-    }
-
-    return {
-      timer: match[1],
-      rounds: Number(match[2]) || 0,
-      manualText: sectionScoreValue.replace(match[0], '').trim(),
-    };
-  };
-
-  const buildSectionScoreValue = (manualText = '', timer = '', rounds = 0) => {
-    const autoPart = timer ? `[auto: ${timer} / ${rounds}]` : '';
-    if (manualText && autoPart) return `${manualText} ${autoPart}`;
-    return manualText || autoPart;
-  };
-
   const toggleVideo = (exerciseKey) => {
     setExpandedVideos(prev => ({
       ...prev,
@@ -223,28 +210,10 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
     setViewMode('week');
   };
 
-  const formatStopwatchTime = (totalSeconds) => {
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-
-    const mm = String(minutes).padStart(2, '0');
-    const ss = String(seconds).padStart(2, '0');
-    if (hours > 0) {
-      return `${String(hours).padStart(2, '0')}:${mm}:${ss}`;
-    }
-    return `${mm}:${ss}`;
-  };
-
   const openFocusedSection = (sectionName, sectionPrescription, exercises) => {
     const lastExercise = exercises[exercises.length - 1];
     const parsedStats = getSectionAutoStats(lastExercise?.['Section Score'] || '');
-    const timerParts = parsedStats.timer ? parsedStats.timer.split(':').map(Number) : [];
-    const stopwatchSeconds = timerParts.length === 3
-      ? (timerParts[0] * 3600) + (timerParts[1] * 60) + timerParts[2]
-      : timerParts.length === 2
-        ? (timerParts[0] * 60) + timerParts[1]
-        : 0;
+    const stopwatchSeconds = parseStopwatchTimeToSeconds(parsedStats.timer);
 
     setFocusedSectionName(sectionName);
     setFocusedSectionPrescription(sectionPrescription || '');

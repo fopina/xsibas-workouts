@@ -853,7 +853,11 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
     if (!focusedSectionName || focusedSectionExercises.length === 0) return;
 
     const timerText = formatStopwatchTime(sectionStopwatchSeconds);
-    const parsedStats = getSectionAutoStats(focusedSectionExercises[0]?.['Section Score'] || '');
+    const currentWorkoutSection = workouts.find(workout =>
+      workout.Section === focusedSectionName &&
+      workout.Date === toDateKey(selectedDate)
+    );
+    const parsedStats = getSectionAutoStats(currentWorkoutSection?.['Section Score'] || focusedSectionExercises[0]?.['Section Score'] || '');
     const nextSectionScore = buildSectionScoreValue(parsedStats.manualText, timerText, sectionRoundCount);
     const sectionRowNumbers = focusedSectionExercises.map(exercise => exercise.__sheetRowNumber).filter(Boolean);
 

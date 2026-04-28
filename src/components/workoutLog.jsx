@@ -863,7 +863,8 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                 color: sectionStopwatchRunning ? '#111' : '#fff'
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '4px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                <div style={{ fontSize: '2.1em', fontWeight: 700 }}>{formatStopwatchTime(sectionStopwatchSeconds)}</div>
                 <span
                   onClick={(event) => {
                     event.stopPropagation();
@@ -882,13 +883,13 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                     borderRadius: '999px',
                     border: `1px solid ${sectionStopwatchRunning ? '#86b85f' : '#444'}`,
                     color: sectionStopwatchRunning ? '#335214' : '#bbb',
-                    fontSize: '0.95em'
+                    fontSize: '0.95em',
+                    flexShrink: 0
                   }}
                 >
                   ↺
                 </span>
               </div>
-              <div style={{ fontSize: '2.1em', fontWeight: 700 }}>{formatStopwatchTime(sectionStopwatchSeconds)}</div>
             </div>
             <button
               onClick={() => setSectionRoundCount(prev => prev + 1)}
@@ -902,7 +903,8 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                 cursor: 'pointer'
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '4px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                <div style={{ fontSize: '2.8em', fontWeight: 700 }}>{sectionRoundCount}</div>
                 <span
                   onClick={(event) => {
                     event.stopPropagation();
@@ -920,13 +922,13 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                     borderRadius: '999px',
                     border: '1px solid #3f5ea8',
                     color: '#c9d5ff',
-                    fontSize: '0.95em'
+                    fontSize: '0.95em',
+                    flexShrink: 0
                   }}
                 >
                   ↺
                 </span>
               </div>
-              <div style={{ fontSize: '2.8em', fontWeight: 700 }}>{sectionRoundCount}</div>
             </button>
           </div>
 

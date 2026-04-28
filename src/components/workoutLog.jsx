@@ -237,7 +237,8 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
   };
 
   const openFocusedSection = (sectionName, sectionPrescription, exercises) => {
-    const parsedStats = getSectionAutoStats(exercises[0]?.['Section Score'] || '');
+    const lastExercise = exercises[exercises.length - 1];
+    const parsedStats = getSectionAutoStats(lastExercise?.['Section Score'] || '');
     const timerParts = parsedStats.timer ? parsedStats.timer.split(':').map(Number) : [];
     const stopwatchSeconds = timerParts.length === 3
       ? (timerParts[0] * 3600) + (timerParts[1] * 60) + timerParts[2]
@@ -853,15 +854,13 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
     if (!focusedSectionName || focusedSectionExercises.length === 0) return;
 
     const timerText = formatStopwatchTime(sectionStopwatchSeconds);
-    const currentWorkoutSection = workouts.find(workout =>
-      workout.Section === focusedSectionName &&
-      workout.Date === toDateKey(selectedDate)
-    );
-    const parsedStats = getSectionAutoStats(currentWorkoutSection?.['Section Score'] || focusedSectionExercises[0]?.['Section Score'] || '');
+    const lastFocusedExercise = focusedSectionExercises[focusedSectionExercises.length - 1];
+    const lastFocusedRowNumber = lastFocusedExercise?.__sheetRowNumber;
+    const currentWorkoutSection = workouts.find(workout => workout.__sheetRowNumber === lastFocusedRowNumber);
+    const parsedStats = getSectionAutoStats(currentWorkoutSection?.['Section Score'] || lastFocusedExercise?.['Section Score'] || '');
     const nextSectionScore = buildSectionScoreValue(parsedStats.manualText, timerText, sectionRoundCount);
-    const sectionRowNumbers = focusedSectionExercises.map(exercise => exercise.__sheetRowNumber).filter(Boolean);
 
-    if (sectionRowNumbers.length === 0) return;
+    if (!lastFocusedRowNumber) return;
 
     try {
       await ensureSheetsApiReady();
@@ -887,23 +886,25 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
       }
 
       const columnLetter = String.fromCharCode(65 + sectionScoreColumnIndex);
-      const requests = sectionRowNumbers.map(rowNumber => gapi.client.sheets.spreadsheets.values.update({
+      await gapi.client.sheets.spreadsheets.values.update({
         spreadsheetId: sheetId,
-        range: `WorkoutLog!${columnLetter}${rowNumber}`,
+        range: `WorkoutLog!${columnLetter}${lastFocusedRowNumber}`,
         valueInputOption: 'RAW',
         resource: {
           values: [[nextSectionScore]]
         }
-      }));
-
-      await Promise.all(requests);
+      });
 
       setWorkouts(prev => prev.map(workout =>
-        sectionRowNumbers.includes(workout.__sheetRowNumber)
+        workout.__sheetRowNumber === lastFocusedRowNumber
           ? { ...workout, ['Section Score']: nextSectionScore }
           : workout
       ));
-      setFocusedSectionExercises(prev => prev.map(exercise => ({ ...exercise, ['Section Score']: nextSectionScore })));
+      setFocusedSectionExercises(prev => prev.map((exercise, index) =>
+        index === prev.length - 1
+          ? { ...exercise, ['Section Score']: nextSectionScore }
+          : exercise
+      ));
     } catch (err) {
       console.error('Error saving focused section stats:', err);
       alert(`Error saving focused section stats: ${err.result?.error?.message || err.message}`);
@@ -1228,7 +1229,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                           </button>
                         </div>
                         {(() => {
-                          const autoStats = getSectionAutoStats(exercises[0]?.['Section Score'] || '');
+                          const autoStats = getSectionAutoStats(exercises[exercises.length - 1]?.['Section Score'] || '');
                           return (sectionPrescription || autoStats.timer) && (
                             <div style={{ marginBottom: '10px' }}>
                               {sectionPrescription && (

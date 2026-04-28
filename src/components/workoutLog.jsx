@@ -1,5 +1,11 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
 import { validateSpreadsheetSchema, formatValidationErrors } from '../utils/schemaValidator';
+import {
+  getSectionAutoStats,
+  buildSectionScoreValue,
+  formatStopwatchTime,
+  parseStopwatchTimeToSeconds,
+} from '../utils/sectionScore';
 
 // We access gapi via the window object, as it's loaded from a script tag.
 const gapi = window.gapi;
@@ -121,6 +127,13 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [weekDragOffset, setWeekDragOffset] = useState(0);
   const [weekSlideTransition, setWeekSlideTransition] = useState('transform 0.18s ease-out');
+  const [focusedSectionName, setFocusedSectionName] = useState(null);
+  const [focusedSectionExercises, setFocusedSectionExercises] = useState([]);
+  const [focusedSectionPrescription, setFocusedSectionPrescription] = useState('');
+  const [sectionStopwatchSeconds, setSectionStopwatchSeconds] = useState(0);
+  const [sectionStopwatchRunning, setSectionStopwatchRunning] = useState(false);
+  const [sectionRoundCount, setSectionRoundCount] = useState(0);
+  const focusedSectionHasPendingChangesRef = useRef(false);
   const weekDragStateRef = useRef({
     pointerId: null,
     startX: 0,
@@ -128,6 +141,16 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
     dragging: false,
     navigated: false,
   });
+
+  useEffect(() => {
+    if (!sectionStopwatchRunning) return;
+
+    const intervalId = window.setInterval(() => {
+      setSectionStopwatchSeconds(prev => prev + 1);
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [sectionStopwatchRunning]);
 
   const toggleVideo = (exerciseKey) => {
     setExpandedVideos(prev => ({
@@ -186,6 +209,30 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
   const handleDayClick = (date) => {
     setSelectedDate(date);
     setViewMode('week');
+  };
+
+  const openFocusedSection = (sectionName, sectionPrescription, exercises) => {
+    const lastExercise = exercises[exercises.length - 1];
+    const parsedStats = getSectionAutoStats(lastExercise?.['Section Score'] || '');
+    const stopwatchSeconds = parseStopwatchTimeToSeconds(parsedStats.timer);
+
+    focusedSectionHasPendingChangesRef.current = false;
+    setFocusedSectionName(sectionName);
+    setFocusedSectionPrescription(sectionPrescription || '');
+    setFocusedSectionExercises(exercises);
+    setSectionStopwatchSeconds(stopwatchSeconds);
+    setSectionStopwatchRunning(false);
+    setSectionRoundCount(parsedStats.rounds || 0);
+  };
+
+  const closeFocusedSection = () => {
+    focusedSectionHasPendingChangesRef.current = false;
+    setFocusedSectionName(null);
+    setFocusedSectionPrescription('');
+    setFocusedSectionExercises([]);
+    setSectionStopwatchRunning(false);
+    setSectionStopwatchSeconds(0);
+    setSectionRoundCount(0);
   };
 
   const changeMonth = (offset) => {
@@ -775,6 +822,240 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
     }
   };
 
+  const updateFocusedSectionStats = async () => {
+    if (!focusedSectionName || focusedSectionExercises.length === 0) return;
+    if (!focusedSectionHasPendingChangesRef.current) return;
+    if (!accessToken) {
+      if (onAuthRequired) onAuthRequired();
+      return;
+    }
+
+    const timerText = formatStopwatchTime(sectionStopwatchSeconds);
+    const lastFocusedExercise = focusedSectionExercises[focusedSectionExercises.length - 1];
+    const lastFocusedRowNumber = lastFocusedExercise?.__sheetRowNumber;
+    const currentWorkoutSection = workouts.find(workout => workout.__sheetRowNumber === lastFocusedRowNumber);
+    const parsedStats = getSectionAutoStats(currentWorkoutSection?.['Section Score'] || lastFocusedExercise?.['Section Score'] || '');
+    const nextSectionScore = buildSectionScoreValue(parsedStats.manualText, timerText, sectionRoundCount);
+
+    if (!lastFocusedRowNumber) return;
+    if (nextSectionScore === (currentWorkoutSection?.['Section Score'] || lastFocusedExercise?.['Section Score'] || '')) {
+      focusedSectionHasPendingChangesRef.current = false;
+      return;
+    }
+
+    try {
+      await ensureSheetsApiReady();
+
+      const response = await gapi.client.sheets.spreadsheets.values.get({
+        spreadsheetId: sheetId,
+        range: 'WorkoutLog!A1:Z1',
+      });
+
+      const headers = response.result.values[0];
+      let sectionScoreColumnIndex = headers.indexOf('Section Score');
+
+      if (sectionScoreColumnIndex === -1) {
+        sectionScoreColumnIndex = headers.length;
+        await gapi.client.sheets.spreadsheets.values.update({
+          spreadsheetId: sheetId,
+          range: `WorkoutLog!${String.fromCharCode(65 + sectionScoreColumnIndex)}1`,
+          valueInputOption: 'RAW',
+          resource: {
+            values: [['Section Score']]
+          }
+        });
+      }
+
+      const columnLetter = String.fromCharCode(65 + sectionScoreColumnIndex);
+      await gapi.client.sheets.spreadsheets.values.update({
+        spreadsheetId: sheetId,
+        range: `WorkoutLog!${columnLetter}${lastFocusedRowNumber}`,
+        valueInputOption: 'RAW',
+        resource: {
+          values: [[nextSectionScore]]
+        }
+      });
+
+      setWorkouts(prev => prev.map(workout =>
+        workout.__sheetRowNumber === lastFocusedRowNumber
+          ? { ...workout, ['Section Score']: nextSectionScore }
+          : workout
+      ));
+      setFocusedSectionExercises(prev => prev.map((exercise, index) =>
+        index === prev.length - 1
+          ? { ...exercise, ['Section Score']: nextSectionScore }
+          : exercise
+      ));
+      focusedSectionHasPendingChangesRef.current = false;
+    } catch (err) {
+      console.error('Error saving focused section stats:', err);
+      alert(`Error saving focused section stats: ${err.result?.error?.message || err.message}`);
+    }
+  };
+
+  useEffect(() => {
+    if (!focusedSectionName) return;
+
+    const timeoutId = window.setTimeout(() => {
+      updateFocusedSectionStats();
+    }, 400);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [focusedSectionName, sectionStopwatchSeconds, sectionRoundCount]);
+
+  if (focusedSectionName) {
+    return (
+      <div style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 2000,
+        backgroundColor: '#111',
+        color: '#fff',
+        overflowY: 'auto',
+        padding: '20px'
+      }}>
+        <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '16px' }}>
+            <div>
+              <h2 style={{ margin: 0, color: '#8bc34a' }}>{focusedSectionName}</h2>
+              {focusedSectionPrescription && (
+                <p style={{ marginTop: '6px', color: '#aaa', fontStyle: 'italic' }}>{focusedSectionPrescription}</p>
+              )}
+            </div>
+            <button onClick={closeFocusedSection} style={{ fontSize: '0.95em', padding: '0.6em 1em' }}>
+              Exit
+            </button>
+          </div>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+            gap: '12px',
+            marginBottom: '20px'
+          }}>
+            <div
+              onClick={() => {
+                focusedSectionHasPendingChangesRef.current = true;
+                setSectionStopwatchRunning(prev => !prev);
+              }}
+              style={{
+                backgroundColor: sectionStopwatchRunning ? '#b9e97c' : '#1a1a1a',
+                border: `1px solid ${sectionStopwatchRunning ? '#b9e97c' : '#333'}`,
+                borderRadius: '10px',
+                padding: '14px',
+                cursor: 'pointer',
+                color: sectionStopwatchRunning ? '#111' : '#fff'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                <div style={{ fontSize: '2.1em', fontWeight: 700 }}>{formatStopwatchTime(sectionStopwatchSeconds)}</div>
+                <span
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    focusedSectionHasPendingChangesRef.current = true;
+                    setSectionStopwatchRunning(false);
+                    setSectionStopwatchSeconds(0);
+                  }}
+                  role="button"
+                  title="Reset timer"
+                  aria-label="Reset timer"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '999px',
+                    border: `1px solid ${sectionStopwatchRunning ? '#86b85f' : '#444'}`,
+                    color: sectionStopwatchRunning ? '#335214' : '#bbb',
+                    fontSize: '0.95em',
+                    flexShrink: 0
+                  }}
+                >
+                  ↺
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                focusedSectionHasPendingChangesRef.current = true;
+                setSectionRoundCount(prev => prev + 1);
+              }}
+              style={{
+                backgroundColor: '#1d2a44',
+                border: '1px solid #3f5ea8',
+                borderRadius: '10px',
+                padding: '14px',
+                color: '#fff',
+                textAlign: 'left',
+                cursor: 'pointer'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                <div style={{ fontSize: '2.8em', fontWeight: 700 }}>{sectionRoundCount}</div>
+                <span
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    focusedSectionHasPendingChangesRef.current = true;
+                    setSectionRoundCount(0);
+                  }}
+                  role="button"
+                  title="Reset rounds"
+                  aria-label="Reset rounds"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '999px',
+                    border: '1px solid #3f5ea8',
+                    color: '#c9d5ff',
+                    fontSize: '0.95em',
+                    flexShrink: 0
+                  }}
+                >
+                  ↺
+                </span>
+              </div>
+            </button>
+          </div>
+
+          <div>
+            {focusedSectionExercises.map((exercise, exerciseIndex) => (
+              <div
+                key={`${focusedSectionName}-${exerciseIndex}`}
+                style={{
+                  marginBottom: '12px',
+                  padding: '14px',
+                  backgroundColor: '#1a1a1a',
+                  borderRadius: '8px',
+                  border: '1px solid #333'
+                }}
+              >
+                {Object.entries(exercise).map(([key, value]) => {
+                  if (key.startsWith('__')) return null;
+                  if (key === 'Date' || key === 'Section' || key === 'Section Prescription' || key === 'Day' || key === 'Section Score') return null;
+                  if (!value && key !== 'Notes') return null;
+
+                  if (key === 'Exercise') {
+                    return <div key={key} style={{ fontSize: '1.15em', fontWeight: 700, marginBottom: '8px' }}>{value}</div>;
+                  }
+
+                  if (key === 'Notes') {
+                    return value ? <div key={key} style={{ color: '#aaa', fontStyle: 'italic' }}>{value}</div> : null;
+                  }
+
+                  return <div key={key} style={{ marginBottom: '4px', color: '#ddd' }}>{value}</div>;
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -904,25 +1185,61 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
 
                     return (
                       <div key={sectionName} style={{ marginBottom: '20px' }}>
-                        <h4 style={{
-                          fontSize: '1.1em',
-                          marginBottom: '5px',
-                          color: '#8bc34a',
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          gap: '10px',
                           borderBottom: '1px solid #444',
-                          paddingBottom: '5px'
+                          paddingBottom: '5px',
+                          marginBottom: '5px'
                         }}>
-                          {sectionName}
-                        </h4>
-                        {sectionPrescription && (
-                          <p style={{
-                            fontSize: '0.9em',
-                            color: '#aaa',
-                            marginBottom: '10px',
-                            fontStyle: 'italic'
+                          <h4 style={{
+                            fontSize: '1.1em',
+                            margin: 0,
+                            color: '#8bc34a'
                           }}>
-                            {sectionPrescription}
-                          </p>
-                        )}
+                            {sectionName}
+                          </h4>
+                          <button
+                            onClick={() => openFocusedSection(sectionName, sectionPrescription, exercises)}
+                            title={`Focus ${sectionName}`}
+                            aria-label={`Focus ${sectionName}`}
+                            style={{
+                              padding: '4px 10px',
+                              fontSize: '0.9em',
+                              backgroundColor: '#333',
+                              color: '#fff',
+                              border: '1px solid #444',
+                              borderRadius: '6px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            ▶
+                          </button>
+                        </div>
+                        {(() => {
+                          const autoStats = getSectionAutoStats(exercises[exercises.length - 1]?.['Section Score'] || '');
+                          return (sectionPrescription || autoStats.timer) && (
+                            <div style={{ marginBottom: '10px' }}>
+                              {sectionPrescription && (
+                                <p style={{
+                                  fontSize: '0.9em',
+                                  color: '#aaa',
+                                  marginBottom: autoStats.timer ? '4px' : '0',
+                                  fontStyle: 'italic'
+                                }}>
+                                  {sectionPrescription}
+                                </p>
+                              )}
+                              {autoStats.timer && (
+                                <div style={{ fontSize: '0.82em', color: '#8aa0c8' }}>
+                                  {autoStats.timer} • {autoStats.rounds} rounds
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                         {exercises.map((exercise, exerciseIndex) => {
                           const videoLink = exerciseVideoMap[exercise.Exercise];
                           const details = exerciseDetailsMap[exercise.Exercise] || {};
@@ -935,6 +1252,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                           const showVideo = expandedVideos[exerciseKey];
                           const notesValue = exercise.Notes || '';
                           const sectionScoreValue = exercise['Section Score'] || '';
+                          const parsedSectionScore = getSectionAutoStats(sectionScoreValue);
                           const isEditingSectionScore = exerciseKey in editingSectionScores;
                           const isSavingSectionScore = exerciseKey in savingSectionScores;
                           const canEditSectionScore = !!accessToken;
@@ -1015,7 +1333,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                                               <button
                                                 onClick={() => setEditingSectionScores(prev => ({
                                                   ...prev,
-                                                  [exerciseKey]: sectionScoreValue
+                                                  [exerciseKey]: parsedSectionScore.manualText
                                                 }))}
                                                 title={sectionScoreValue ? 'Edit section score' : 'Add section score'}
                                                 aria-label={sectionScoreValue ? 'Edit section score' : 'Add section score'}
@@ -1144,7 +1462,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                                           />
                                           <div style={{ marginTop: '5px', display: 'flex', gap: '5px' }}>
                                             <button
-                                              onClick={() => updateSectionScore(sheetRowNumber, editingSectionScores[exerciseKey] || '', exerciseKey)}
+                                              onClick={() => updateSectionScore(sheetRowNumber, buildSectionScoreValue(editingSectionScores[exerciseKey] || '', parsedSectionScore.timer, parsedSectionScore.rounds), exerciseKey)}
                                               disabled={isSavingSectionScore}
                                               style={{
                                                 padding: '5px 10px',
@@ -1182,12 +1500,12 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                                         </div>
                                       ) : (
                                         <div style={{ marginTop: '5px' }}>
-                                          {sectionScoreValue && (
+                                          {parsedSectionScore.manualText && (
                                             <div style={{
                                               color: '#aaa',
                                               marginBottom: '4px'
                                             }}>
-                                              🕒 {sectionScoreValue}
+                                              🕒 {parsedSectionScore.manualText}
                                             </div>
                                           )}
                                         </div>

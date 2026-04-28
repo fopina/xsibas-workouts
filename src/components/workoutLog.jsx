@@ -133,6 +133,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
   const [sectionStopwatchSeconds, setSectionStopwatchSeconds] = useState(0);
   const [sectionStopwatchRunning, setSectionStopwatchRunning] = useState(false);
   const [sectionRoundCount, setSectionRoundCount] = useState(0);
+  const focusedSectionHasPendingChangesRef = useRef(false);
   const weekDragStateRef = useRef({
     pointerId: null,
     startX: 0,
@@ -215,6 +216,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
     const parsedStats = getSectionAutoStats(lastExercise?.['Section Score'] || '');
     const stopwatchSeconds = parseStopwatchTimeToSeconds(parsedStats.timer);
 
+    focusedSectionHasPendingChangesRef.current = false;
     setFocusedSectionName(sectionName);
     setFocusedSectionPrescription(sectionPrescription || '');
     setFocusedSectionExercises(exercises);
@@ -224,6 +226,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
   };
 
   const closeFocusedSection = () => {
+    focusedSectionHasPendingChangesRef.current = false;
     setFocusedSectionName(null);
     setFocusedSectionPrescription('');
     setFocusedSectionExercises([]);
@@ -821,6 +824,11 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
 
   const updateFocusedSectionStats = async () => {
     if (!focusedSectionName || focusedSectionExercises.length === 0) return;
+    if (!focusedSectionHasPendingChangesRef.current) return;
+    if (!accessToken) {
+      if (onAuthRequired) onAuthRequired();
+      return;
+    }
 
     const timerText = formatStopwatchTime(sectionStopwatchSeconds);
     const lastFocusedExercise = focusedSectionExercises[focusedSectionExercises.length - 1];
@@ -830,6 +838,10 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
     const nextSectionScore = buildSectionScoreValue(parsedStats.manualText, timerText, sectionRoundCount);
 
     if (!lastFocusedRowNumber) return;
+    if (nextSectionScore === (currentWorkoutSection?.['Section Score'] || lastFocusedExercise?.['Section Score'] || '')) {
+      focusedSectionHasPendingChangesRef.current = false;
+      return;
+    }
 
     try {
       await ensureSheetsApiReady();
@@ -874,6 +886,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
           ? { ...exercise, ['Section Score']: nextSectionScore }
           : exercise
       ));
+      focusedSectionHasPendingChangesRef.current = false;
     } catch (err) {
       console.error('Error saving focused section stats:', err);
       alert(`Error saving focused section stats: ${err.result?.error?.message || err.message}`);
@@ -921,7 +934,10 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
             marginBottom: '20px'
           }}>
             <div
-              onClick={() => setSectionStopwatchRunning(prev => !prev)}
+              onClick={() => {
+                focusedSectionHasPendingChangesRef.current = true;
+                setSectionStopwatchRunning(prev => !prev);
+              }}
               style={{
                 backgroundColor: sectionStopwatchRunning ? '#b9e97c' : '#1a1a1a',
                 border: `1px solid ${sectionStopwatchRunning ? '#b9e97c' : '#333'}`,
@@ -936,6 +952,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                 <span
                   onClick={(event) => {
                     event.stopPropagation();
+                    focusedSectionHasPendingChangesRef.current = true;
                     setSectionStopwatchRunning(false);
                     setSectionStopwatchSeconds(0);
                   }}
@@ -960,7 +977,10 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
               </div>
             </div>
             <button
-              onClick={() => setSectionRoundCount(prev => prev + 1)}
+              onClick={() => {
+                focusedSectionHasPendingChangesRef.current = true;
+                setSectionRoundCount(prev => prev + 1);
+              }}
               style={{
                 backgroundColor: '#1d2a44',
                 border: '1px solid #3f5ea8',
@@ -976,6 +996,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                 <span
                   onClick={(event) => {
                     event.stopPropagation();
+                    focusedSectionHasPendingChangesRef.current = true;
                     setSectionRoundCount(0);
                   }}
                   role="button"

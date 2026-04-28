@@ -53,6 +53,14 @@ describe('sectionScore helpers', () => {
     it('preserves manual text and appends auto suffix', () => {
       expect(buildSectionScoreValue('Manual note', '00:05', 5)).toBe('Manual note [auto: 00:05 / 5]');
     });
+
+    it('keeps empty manual text from producing extra whitespace', () => {
+      expect(buildSectionScoreValue('', '12:34', 2)).toBe('[auto: 12:34 / 2]');
+    });
+
+    it('returns empty string when both manual and auto values are empty', () => {
+      expect(buildSectionScoreValue('', '', 0)).toBe('');
+    });
   });
 
   describe('stopwatch formatting/parsing', () => {
@@ -75,6 +83,11 @@ describe('sectionScore helpers', () => {
     it('returns zero for invalid or empty timer text', () => {
       expect(parseStopwatchTimeToSeconds('')).toBe(0);
       expect(parseStopwatchTimeToSeconds('abc')).toBe(0);
+    });
+
+    it('round-trips timer text through format and parse', () => {
+      const seconds = 754;
+      expect(parseStopwatchTimeToSeconds(formatStopwatchTime(seconds))).toBe(seconds);
     });
   });
 });

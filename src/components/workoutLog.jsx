@@ -3,7 +3,6 @@ import { validateSpreadsheetSchema, formatValidationErrors } from '../utils/sche
 
 // We access gapi via the window object, as it's loaded from a script tag.
 const gapi = window.gapi;
-const SECTION_FOCUS_STATS_KEY = 'workout_section_focus_stats';
 
 const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, onSessionExpired }) => {
   const [workouts, setWorkouts] = useState([]);
@@ -128,7 +127,6 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
   const [sectionStopwatchSeconds, setSectionStopwatchSeconds] = useState(0);
   const [sectionStopwatchRunning, setSectionStopwatchRunning] = useState(false);
   const [sectionRoundCount, setSectionRoundCount] = useState(0);
-  const [sectionFocusStats, setSectionFocusStats] = useState({});
   const weekDragStateRef = useRef({
     pointerId: null,
     startX: 0,
@@ -147,26 +145,24 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
     return () => window.clearInterval(intervalId);
   }, [sectionStopwatchRunning]);
 
-  const getSectionFocusStatsKey = (date, sectionName) => `${toDateKey(date)}::${sectionName}`;
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(SECTION_FOCUS_STATS_KEY);
-      if (raw) {
-        setSectionFocusStats(JSON.parse(raw));
-      }
-    } catch (err) {
-      console.error('Error loading section focus stats:', err);
+  const getSectionAutoStats = (sectionScoreValue = '') => {
+    const match = sectionScoreValue.match(/\[auto:\s*(\d{2}:\d{2}(?::\d{2})?)\s*\/\s*(\d+)\]$/);
+    if (!match) {
+      return { timer: '', rounds: 0, manualText: sectionScoreValue.trim() };
     }
-  }, []);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(SECTION_FOCUS_STATS_KEY, JSON.stringify(sectionFocusStats));
-    } catch (err) {
-      console.error('Error saving section focus stats:', err);
-    }
-  }, [sectionFocusStats]);
+    return {
+      timer: match[1],
+      rounds: Number(match[2]) || 0,
+      manualText: sectionScoreValue.replace(match[0], '').trim(),
+    };
+  };
+
+  const buildSectionScoreValue = (manualText = '', timer = '', rounds = 0) => {
+    const autoPart = timer ? `[auto: ${timer} / ${rounds}]` : '';
+    if (manualText && autoPart) return `${manualText} ${autoPart}`;
+    return manualText || autoPart;
+  };
 
   const toggleVideo = (exerciseKey) => {
     setExpandedVideos(prev => ({
@@ -241,29 +237,23 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
   };
 
   const openFocusedSection = (sectionName, sectionPrescription, exercises) => {
-    const statsKey = getSectionFocusStatsKey(selectedDate, sectionName);
-    const savedStats = sectionFocusStats[statsKey] || { stopwatchSeconds: 0, roundCount: 0 };
+    const parsedStats = getSectionAutoStats(exercises[0]?.['Section Score'] || '');
+    const timerParts = parsedStats.timer ? parsedStats.timer.split(':').map(Number) : [];
+    const stopwatchSeconds = timerParts.length === 3
+      ? (timerParts[0] * 3600) + (timerParts[1] * 60) + timerParts[2]
+      : timerParts.length === 2
+        ? (timerParts[0] * 60) + timerParts[1]
+        : 0;
 
     setFocusedSectionName(sectionName);
     setFocusedSectionPrescription(sectionPrescription || '');
     setFocusedSectionExercises(exercises);
-    setSectionStopwatchSeconds(savedStats.stopwatchSeconds || 0);
+    setSectionStopwatchSeconds(stopwatchSeconds);
     setSectionStopwatchRunning(false);
-    setSectionRoundCount(savedStats.roundCount || 0);
+    setSectionRoundCount(parsedStats.rounds || 0);
   };
 
   const closeFocusedSection = () => {
-    if (focusedSectionName) {
-      const statsKey = getSectionFocusStatsKey(selectedDate, focusedSectionName);
-      setSectionFocusStats(prev => ({
-        ...prev,
-        [statsKey]: {
-          stopwatchSeconds: sectionStopwatchSeconds,
-          roundCount: sectionRoundCount,
-        }
-      }));
-    }
-
     setFocusedSectionName(null);
     setFocusedSectionPrescription('');
     setFocusedSectionExercises([]);
@@ -859,6 +849,73 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
     }
   };
 
+  const updateFocusedSectionStats = async () => {
+    if (!focusedSectionName || focusedSectionExercises.length === 0) return;
+
+    const timerText = formatStopwatchTime(sectionStopwatchSeconds);
+    const parsedStats = getSectionAutoStats(focusedSectionExercises[0]?.['Section Score'] || '');
+    const nextSectionScore = buildSectionScoreValue(parsedStats.manualText, timerText, sectionRoundCount);
+    const sectionRowNumbers = focusedSectionExercises.map(exercise => exercise.__sheetRowNumber).filter(Boolean);
+
+    if (sectionRowNumbers.length === 0) return;
+
+    try {
+      await ensureSheetsApiReady();
+
+      const response = await gapi.client.sheets.spreadsheets.values.get({
+        spreadsheetId: sheetId,
+        range: 'WorkoutLog!A1:Z1',
+      });
+
+      const headers = response.result.values[0];
+      let sectionScoreColumnIndex = headers.indexOf('Section Score');
+
+      if (sectionScoreColumnIndex === -1) {
+        sectionScoreColumnIndex = headers.length;
+        await gapi.client.sheets.spreadsheets.values.update({
+          spreadsheetId: sheetId,
+          range: `WorkoutLog!${String.fromCharCode(65 + sectionScoreColumnIndex)}1`,
+          valueInputOption: 'RAW',
+          resource: {
+            values: [['Section Score']]
+          }
+        });
+      }
+
+      const columnLetter = String.fromCharCode(65 + sectionScoreColumnIndex);
+      const requests = sectionRowNumbers.map(rowNumber => gapi.client.sheets.spreadsheets.values.update({
+        spreadsheetId: sheetId,
+        range: `WorkoutLog!${columnLetter}${rowNumber}`,
+        valueInputOption: 'RAW',
+        resource: {
+          values: [[nextSectionScore]]
+        }
+      }));
+
+      await Promise.all(requests);
+
+      setWorkouts(prev => prev.map(workout =>
+        sectionRowNumbers.includes(workout.__sheetRowNumber)
+          ? { ...workout, ['Section Score']: nextSectionScore }
+          : workout
+      ));
+      setFocusedSectionExercises(prev => prev.map(exercise => ({ ...exercise, ['Section Score']: nextSectionScore })));
+    } catch (err) {
+      console.error('Error saving focused section stats:', err);
+      alert(`Error saving focused section stats: ${err.result?.error?.message || err.message}`);
+    }
+  };
+
+  useEffect(() => {
+    if (!focusedSectionName) return;
+
+    const timeoutId = window.setTimeout(() => {
+      updateFocusedSectionStats();
+    }, 400);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [focusedSectionName, sectionStopwatchSeconds, sectionRoundCount]);
+
   if (focusedSectionName) {
     return (
       <div style={{
@@ -1166,25 +1223,28 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                             ▶
                           </button>
                         </div>
-                        {(sectionPrescription || sectionFocusStats[getSectionFocusStatsKey(selectedDate, sectionName)]) && (
-                          <div style={{ marginBottom: '10px' }}>
-                            {sectionPrescription && (
-                              <p style={{
-                                fontSize: '0.9em',
-                                color: '#aaa',
-                                marginBottom: '4px',
-                                fontStyle: 'italic'
-                              }}>
-                                {sectionPrescription}
-                              </p>
-                            )}
-                            {sectionFocusStats[getSectionFocusStatsKey(selectedDate, sectionName)] && (
-                              <div style={{ fontSize: '0.82em', color: '#8aa0c8' }}>
-                                {formatStopwatchTime(sectionFocusStats[getSectionFocusStatsKey(selectedDate, sectionName)].stopwatchSeconds || 0)} • {sectionFocusStats[getSectionFocusStatsKey(selectedDate, sectionName)].roundCount || 0} rounds
-                              </div>
-                            )}
-                          </div>
-                        )}
+                        {(() => {
+                          const autoStats = getSectionAutoStats(exercises[0]?.['Section Score'] || '');
+                          return (sectionPrescription || autoStats.timer) && (
+                            <div style={{ marginBottom: '10px' }}>
+                              {sectionPrescription && (
+                                <p style={{
+                                  fontSize: '0.9em',
+                                  color: '#aaa',
+                                  marginBottom: autoStats.timer ? '4px' : '0',
+                                  fontStyle: 'italic'
+                                }}>
+                                  {sectionPrescription}
+                                </p>
+                              )}
+                              {autoStats.timer && (
+                                <div style={{ fontSize: '0.82em', color: '#8aa0c8' }}>
+                                  {autoStats.timer} • {autoStats.rounds} rounds
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                         {exercises.map((exercise, exerciseIndex) => {
                           const videoLink = exerciseVideoMap[exercise.Exercise];
                           const details = exerciseDetailsMap[exercise.Exercise] || {};

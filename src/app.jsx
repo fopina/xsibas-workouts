@@ -711,21 +711,47 @@ export function App() {
                   </button>
                 )}
                 <div ref={topMenuRef} style={{ position: 'relative' }}>
-                  <button
-                    onClick={() => setTopMenuOpen(prev => !prev)}
-                    aria-haspopup="menu"
-                    aria-expanded={topMenuOpen}
-                    style={{
-                      padding: '0.5em 0.9em',
-                      fontSize: '0.9em',
-                      backgroundColor: '#333',
-                      border: '1px solid #555',
-                      cursor: 'pointer',
-                      minWidth: '96px'
-                    }}
-                  >
-                    {userName || authUserName || 'Guest'} ▾
-                  </button>
+                  <div style={{ display: 'flex', alignItems: 'stretch' }}>
+                    <button
+                      onClick={() => {
+                        if (!authToken && authReady) {
+                          login();
+                        }
+                      }}
+                      disabled={!authToken && !authReady}
+                      aria-label={authToken ? (userName || authUserName || 'Logged in user') : 'Log In'}
+                      style={{
+                        padding: '0.5em 0.9em',
+                        fontSize: '0.9em',
+                        backgroundColor: '#333',
+                        border: '1px solid #555',
+                        borderRight: 'none',
+                        borderRadius: '6px 0 0 6px',
+                        cursor: authToken ? 'default' : (!authReady ? 'default' : 'pointer'),
+                        minWidth: '96px',
+                        color: !authToken && !authReady ? '#666' : '#fff'
+                      }}
+                    >
+                      {authToken ? (userName || authUserName || 'Logged in') : 'Log In'}
+                    </button>
+                    <button
+                      onClick={() => setTopMenuOpen(prev => !prev)}
+                      aria-label="Open account menu"
+                      aria-haspopup="menu"
+                      aria-expanded={topMenuOpen}
+                      style={{
+                        width: '36px',
+                        padding: 0,
+                        fontSize: '0.9em',
+                        backgroundColor: '#333',
+                        border: '1px solid #555',
+                        borderRadius: '0 6px 6px 0',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      ▾
+                    </button>
+                  </div>
                   {topMenuOpen && (
                     <div
                       role="menu"
@@ -749,7 +775,7 @@ export function App() {
                         borderBottom: '1px solid #333',
                         marginBottom: '6px'
                       }}>
-                        {userName || authUserName || 'Guest'}
+                        {authToken ? (userName || authUserName || 'Logged in') : 'Guest'}
                       </div>
                       {sheetId && (
                         <button
@@ -773,31 +799,28 @@ export function App() {
                           Sheets
                         </button>
                       )}
-                      <button
-                        role="menuitem"
-                        onClick={() => {
-                          setTopMenuOpen(false);
-                          if (authToken) {
+                      {authToken && (
+                        <button
+                          role="menuitem"
+                          onClick={() => {
+                            setTopMenuOpen(false);
                             logout();
-                          } else {
-                            login();
-                          }
-                        }}
-                        disabled={!authToken && !authReady}
-                        style={{
-                          width: '100%',
-                          textAlign: 'left',
-                          padding: '0.65em 0.7em',
-                          fontSize: '0.9em',
-                          backgroundColor: 'transparent',
-                          color: !authToken && !authReady ? '#666' : '#fff',
-                          border: 'none',
-                          borderRadius: '6px',
-                          cursor: !authToken && !authReady ? 'default' : 'pointer'
-                        }}
-                      >
-                        {authToken ? 'Log Out' : 'Log In'}
-                      </button>
+                          }}
+                          style={{
+                            width: '100%',
+                            textAlign: 'left',
+                            padding: '0.65em 0.7em',
+                            fontSize: '0.9em',
+                            backgroundColor: 'transparent',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Log Out
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

@@ -31,12 +31,15 @@ async function primeAuthState(page, token) {
 
 async function expectWorkoutViewLoaded(page, sheetId) {
   await expect(page).toHaveURL(new RegExp(`/workout\\?sheet=${sheetId}`));
-  await expect(page.getByRole('button', { name: 'Log Out' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Service Account' })).toBeVisible();
 
   // Wait for the workout view (not just the sheet selector) to render.
   await expect(page.getByRole('heading', { name: 'Workout' })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole('button', { name: 'Today' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Month View' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Open account menu' }).click();
+  await expect(page.getByRole('menuitem', { name: 'Log Out' })).toBeVisible();
 }
 
 test('loads a shared sheet using service-account token from env', async ({ page }) => {

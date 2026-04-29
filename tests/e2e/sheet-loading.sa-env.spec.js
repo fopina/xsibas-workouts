@@ -39,7 +39,7 @@ async function expectWorkoutViewLoaded(page, sheetId) {
   await expect(page.getByRole('button', { name: 'Month View' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Open account menu' }).click();
-  await expect(page.getByRole('button', { name: 'Log Out' })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: 'Log Out' })).toBeVisible();
 }
 
 test('loads a shared sheet using service-account token from env', async ({ page }) => {

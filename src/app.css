@@ -5,10 +5,17 @@
   color-scheme: light dark;
   color: rgba(255, 255, 255, 0.87);
   background-color: #242424;
+  --app-max-width: 800px;
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --app-max-width: 1120px;
+  }
 }
 
 .app-container {
-  max-width: 800px;
+  max-width: var(--app-max-width);
   margin: 0 auto;
   padding: 1rem;
   text-align: center;
@@ -31,7 +38,7 @@ header {
   left: 50%;
   transform: translateX(-50%);
   width: 100%;
-  max-width: 800px;
+  max-width: var(--app-max-width);
   z-index: 1000;
   display: flex;
   justify-content: space-between;
@@ -58,7 +65,7 @@ main {
   flex: 1;
   padding-top: 80px;
   padding-bottom: 60px;
-  max-width: 800px;
+  max-width: var(--app-max-width);
   margin: 0 auto;
   width: 100%;
 }
@@ -75,7 +82,7 @@ footer {
   left: 50%;
   transform: translateX(-50%);
   width: 100%;
-  max-width: 800px;
+  max-width: var(--app-max-width);
   z-index: 1000;
   background-color: #242424;
   border-top: 1px solid #333;

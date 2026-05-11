@@ -831,7 +831,7 @@ export function App() {
                           role="menuitem"
                           onClick={() => {
                             setTopMenuOpen(false);
-                            login({ forcePrompt: true });
+                            login();
                           }}
                           style={{
                             width: '100%',

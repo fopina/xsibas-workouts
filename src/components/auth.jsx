@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'preact/hooks';
+import { TOKEN_EXPIRES_AT_KEY, getJwtExpiresAt, getTokenResponseExpiresAt } from '../utils/authToken';
 
 const STORAGE_KEY = 'google_access_token';
 const USER_NAME_KEY = 'google_user_name';
@@ -12,6 +13,7 @@ const Auth = ({ accessToken, onAuthChange, onUserNameChange, onReadyStateChange,
     setUserName(null);
     if (onUserNameChange) onUserNameChange(null);
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(TOKEN_EXPIRES_AT_KEY);
     localStorage.removeItem(USER_NAME_KEY);
     if (clearStoredEmail) {
       localStorage.removeItem(USER_EMAIL_KEY);
@@ -22,9 +24,19 @@ const Auth = ({ accessToken, onAuthChange, onUserNameChange, onReadyStateChange,
   useEffect(() => {
     const storedToken = localStorage.getItem(STORAGE_KEY);
     const storedUserName = localStorage.getItem(USER_NAME_KEY);
+    const storedExpiresAt = Number(localStorage.getItem(TOKEN_EXPIRES_AT_KEY));
+    const expiresAt = Number.isFinite(storedExpiresAt) && storedExpiresAt > 0
+      ? storedExpiresAt
+      : getJwtExpiresAt(storedToken);
+
     if (storedToken) {
+      if (expiresAt && expiresAt <= Date.now()) {
+        clearAuthState({ clearStoredEmail: false });
+        return;
+      }
+
       console.log('Restored token from localStorage');
-      onAuthChange(storedToken);
+      onAuthChange(storedToken, expiresAt);
       if (storedUserName) {
         setUserName(storedUserName);
         if (onUserNameChange) onUserNameChange(storedUserName);
@@ -43,8 +55,15 @@ const Auth = ({ accessToken, onAuthChange, onUserNameChange, onReadyStateChange,
           callback: async (tokenResponse) => {
             console.log('Token response received:', tokenResponse);
             if (tokenResponse && tokenResponse.access_token) {
+              const expiresAt = getTokenResponseExpiresAt(tokenResponse.access_token, tokenResponse);
+
               localStorage.setItem(STORAGE_KEY, tokenResponse.access_token);
-              onAuthChange(tokenResponse.access_token);
+              if (expiresAt) {
+                localStorage.setItem(TOKEN_EXPIRES_AT_KEY, String(expiresAt));
+              } else {
+                localStorage.removeItem(TOKEN_EXPIRES_AT_KEY);
+              }
+              onAuthChange(tokenResponse.access_token, expiresAt);
 
               try {
                 const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {

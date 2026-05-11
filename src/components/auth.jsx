@@ -105,13 +105,14 @@ const Auth = ({ accessToken, onAuthChange, onUserNameChange, onReadyStateChange,
     };
   }, []);
 
-  const handleLogin = () => {
+  const handleLogin = ({ forcePrompt = false } = {}) => {
     console.log('Login button clicked');
     console.log('Token client available:', !!tokenClient);
     if (tokenClient) {
       const loginHint = localStorage.getItem(USER_EMAIL_KEY);
-      console.log('Requesting access token...', loginHint ? 'with login_hint and prompt=""' : 'with prompt="" and without login_hint');
-      tokenClient.requestAccessToken(loginHint ? { login_hint: loginHint, prompt: '' } : { prompt: '' });
+      const prompt = forcePrompt ? 'consent' : '';
+      console.log('Requesting access token...', loginHint ? `with login_hint and prompt="${prompt}"` : `with prompt="${prompt}" and without login_hint`);
+      tokenClient.requestAccessToken(loginHint ? { login_hint: loginHint, prompt } : { prompt });
     } else {
       console.error('Token client not initialized');
     }

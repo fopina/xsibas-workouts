@@ -831,6 +831,28 @@ export function App() {
                           role="menuitem"
                           onClick={() => {
                             setTopMenuOpen(false);
+                            login({ forcePrompt: true });
+                          }}
+                          style={{
+                            width: '100%',
+                            textAlign: 'left',
+                            padding: '0.65em 0.7em',
+                            fontSize: '0.9em',
+                            backgroundColor: 'transparent',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Renew session
+                        </button>
+                      )}
+                      {authToken && (
+                        <button
+                          role="menuitem"
+                          onClick={() => {
+                            setTopMenuOpen(false);
                             logout();
                           }}
                           style={{

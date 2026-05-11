@@ -3,6 +3,7 @@ import Auth from './components/auth';
 import WorkoutLog from './components/workoutLog';
 import Landing from './components/landing';
 import { useWakeLock } from './hooks/useWakeLock';
+import { formatSessionTimeLeft } from './utils/authToken';
 import './app.css';
 
 const gapi = window.gapi;
@@ -13,6 +14,8 @@ const getCurrentRoute = () => `${window.location.pathname}${window.location.sear
 
 export function App() {
   const [accessToken, setAccessToken] = useState(null);
+  const [authExpiresAt, setAuthExpiresAt] = useState(null);
+  const [authNow, setAuthNow] = useState(Date.now());
   const [forceLogoutVersion, setForceLogoutVersion] = useState(0);
   const [authUiMessage, setAuthUiMessage] = useState('');
   const [isGapiLoaded, setIsGapiLoaded] = useState(false);
@@ -98,6 +101,16 @@ export function App() {
       document.removeEventListener('touchstart', handleOutsideClick);
     };
   }, []);
+
+  useEffect(() => {
+    if (!accessToken || !authExpiresAt) return undefined;
+
+    setAuthNow(Date.now());
+    const timer = setInterval(() => setAuthNow(Date.now()), 60000);
+    return () => clearInterval(timer);
+  }, [accessToken, authExpiresAt]);
+
+  const sessionTimeLeft = formatSessionTimeLeft(authExpiresAt, authNow);
 
   // Detect if running as standalone PWA
   useEffect(() => {
@@ -300,8 +313,10 @@ export function App() {
      return () => clearInterval(checkGapiReady);
   }, []);
 
-  const handleAuthChange = (token) => {
+  const handleAuthChange = (token, expiresAt = null) => {
     setAccessToken(token);
+    setAuthExpiresAt(expiresAt);
+    setAuthNow(Date.now());
     if (token) {
       setAuthUiMessage('');
     }
@@ -775,7 +790,19 @@ export function App() {
                         borderBottom: '1px solid #333',
                         marginBottom: '6px'
                       }}>
-                        {authToken ? (userName || authUserName || 'Logged in') : 'Guest'}
+                        <div>{authToken ? (userName || authUserName || 'Logged in') : 'Guest'}</div>
+                        {authToken && sessionTimeLeft && (
+                          <div
+                            title={authExpiresAt ? `Session expires at ${new Date(authExpiresAt).toLocaleTimeString()}` : undefined}
+                            style={{
+                              marginTop: '0.25em',
+                              fontSize: '0.9em',
+                              color: sessionTimeLeft === 'expired' ? '#ff9800' : '#bbb'
+                            }}
+                          >
+                            Session: {sessionTimeLeft}
+                          </div>
+                        )}
                       </div>
                       {sheetId && (
                         <button
@@ -797,6 +824,28 @@ export function App() {
                           }}
                         >
                           Sheets
+                        </button>
+                      )}
+                      {authToken && (
+                        <button
+                          role="menuitem"
+                          onClick={() => {
+                            setTopMenuOpen(false);
+                            login({ forcePrompt: true });
+                          }}
+                          style={{
+                            width: '100%',
+                            textAlign: 'left',
+                            padding: '0.65em 0.7em',
+                            fontSize: '0.9em',
+                            backgroundColor: 'transparent',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Renew session
                         </button>
                       )}
                       {authToken && (

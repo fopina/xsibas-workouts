@@ -225,7 +225,8 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
     setSectionRoundCount(parsedStats.rounds || 0);
   };
 
-  const closeFocusedSection = () => {
+  const closeFocusedSection = async () => {
+    await updateFocusedSectionStats({ force: true });
     focusedSectionHasPendingChangesRef.current = false;
     setFocusedSectionName(null);
     setFocusedSectionPrescription('');
@@ -822,20 +823,24 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
     }
   };
 
-  const updateFocusedSectionStats = async () => {
+  const updateFocusedSectionStats = async ({
+    stopwatchSeconds = sectionStopwatchSeconds,
+    roundCount = sectionRoundCount,
+    force = false,
+  } = {}) => {
     if (!focusedSectionName || focusedSectionExercises.length === 0) return;
-    if (!focusedSectionHasPendingChangesRef.current) return;
+    if (!force && !focusedSectionHasPendingChangesRef.current) return;
     if (!accessToken) {
       if (onAuthRequired) onAuthRequired();
       return;
     }
 
-    const timerText = formatStopwatchTime(sectionStopwatchSeconds);
+    const timerText = formatStopwatchTime(stopwatchSeconds);
     const lastFocusedExercise = focusedSectionExercises[focusedSectionExercises.length - 1];
     const lastFocusedRowNumber = lastFocusedExercise?.__sheetRowNumber;
     const currentWorkoutSection = workouts.find(workout => workout.__sheetRowNumber === lastFocusedRowNumber);
     const parsedStats = getSectionAutoStats(currentWorkoutSection?.['Section Score'] || lastFocusedExercise?.['Section Score'] || '');
-    const nextSectionScore = buildSectionScoreValue(parsedStats.manualText, timerText, sectionRoundCount);
+    const nextSectionScore = buildSectionScoreValue(parsedStats.manualText, timerText, roundCount);
 
     if (!lastFocusedRowNumber) return;
     if (nextSectionScore === (currentWorkoutSection?.['Section Score'] || lastFocusedExercise?.['Section Score'] || '')) {
@@ -895,13 +900,14 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
 
   useEffect(() => {
     if (!focusedSectionName) return;
+    if (sectionStopwatchRunning) return;
 
     const timeoutId = window.setTimeout(() => {
       updateFocusedSectionStats();
     }, 400);
 
     return () => window.clearTimeout(timeoutId);
-  }, [focusedSectionName, sectionStopwatchSeconds, sectionRoundCount]);
+  }, [focusedSectionName, sectionStopwatchRunning, sectionStopwatchSeconds, sectionRoundCount]);
 
   if (focusedSectionName) {
     return (
@@ -934,9 +940,14 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
             marginBottom: '20px'
           }}>
             <div
-              onClick={() => {
+              onClick={async () => {
                 focusedSectionHasPendingChangesRef.current = true;
-                setSectionStopwatchRunning(prev => !prev);
+                if (sectionStopwatchRunning) {
+                  setSectionStopwatchRunning(false);
+                  await updateFocusedSectionStats({ force: true });
+                } else {
+                  setSectionStopwatchRunning(true);
+                }
               }}
               style={{
                 backgroundColor: sectionStopwatchRunning ? '#b9e97c' : '#1a1a1a',
@@ -955,6 +966,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                     focusedSectionHasPendingChangesRef.current = true;
                     setSectionStopwatchRunning(false);
                     setSectionStopwatchSeconds(0);
+                    updateFocusedSectionStats({ stopwatchSeconds: 0, force: true });
                   }}
                   role="button"
                   title="Reset timer"

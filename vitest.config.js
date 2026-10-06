@@ -14,11 +14,16 @@ export default defineConfig({
         'node_modules/',
         'tests/',
         '**/*.test.js',
+        '**/*.test.jsx',
         '**/*.config.js',
         'dist/'
       ]
     },
-    include: ['src/**/*.test.js', 'tests/**/*.test.js'],
+    include: [
+      'src/**/*.test.js',
+      'src/**/*.test.jsx',
+      'tests/**/*.test.js'
+    ],
     exclude: ['tests/integration/**/*.test.js', 'node_modules/']
   }
 });

@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'preact/hooks';
 import { validateSpreadsheetSchema, formatValidationErrors } from '../utils/schemaValidator';
 import { findAdjacentWorkoutDateKeys, hasWorkoutInDateKeys } from '../utils/workoutNavigation';
-import { getSwipeDirection, getWeekDates } from '../utils/weekCarousel';
+import { getWeekDates } from '../utils/weekCarousel';
+import WeekCarousel from './weekCarousel';
 import {
   getSectionAutoStats,
   buildSectionScoreValue,
@@ -126,9 +127,6 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
   const [selectedDate, setSelectedDate] = useState(getInitialDate());
   const [viewMode, setViewMode] = useState('week'); // 'week' or 'month'
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [weekDragOffset, setWeekDragOffset] = useState(0);
-  const [weekSlideDirection, setWeekSlideDirection] = useState(null);
-  const [weekSlideTransition, setWeekSlideTransition] = useState('none');
   const [focusedSectionName, setFocusedSectionName] = useState(null);
   const [focusedSectionExercises, setFocusedSectionExercises] = useState([]);
   const [focusedSectionPrescription, setFocusedSectionPrescription] = useState('');
@@ -136,14 +134,6 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
   const [sectionStopwatchRunning, setSectionStopwatchRunning] = useState(false);
   const [sectionRoundCount, setSectionRoundCount] = useState(0);
   const focusedSectionHasPendingChangesRef = useRef(false);
-  const weekDragStateRef = useRef({
-    pointerId: null,
-    startX: 0,
-    startY: 0,
-    lastDeltaX: 0,
-    dragging: false,
-  });
-  const weekSlideAnimatingRef = useRef(false);
 
   useEffect(() => {
     if (!sectionStopwatchRunning) return;
@@ -171,8 +161,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
     window.history.replaceState({}, '', newUrl);
   }, [selectedDate]);
 
-  const weekPanels = useMemo(() => [-1, 0, 1].map(offset => getWeekDates(selectedDate, offset)), [selectedDate]);
-  const weekDates = weekPanels[1];
+  const weekDates = useMemo(() => getWeekDates(selectedDate), [selectedDate]);
 
   const adjacentWorkoutDates = useMemo(() => findAdjacentWorkoutDateKeys(
     Object.keys(workoutDateRowsMap),
@@ -239,91 +228,6 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
     newMonth.setMonth(currentMonth.getMonth() + offset);
     setCurrentMonth(newMonth);
   };
-
-  const shiftSelectedDateByDays = (days) => {
-    setSelectedDate(prev => {
-      const next = new Date(prev);
-      next.setDate(prev.getDate() + days);
-      return next;
-    });
-  };
-
-  const handleWeekPointerDown = (event) => {
-    if (viewMode !== 'week' || weekSlideAnimatingRef.current) return;
-    event.currentTarget.setPointerCapture?.(event.pointerId);
-    setWeekSlideTransition('none');
-    weekDragStateRef.current = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      lastDeltaX: 0,
-      dragging: false,
-    };
-  };
-
-  const handleWeekPointerMove = (event) => {
-    const state = weekDragStateRef.current;
-    if (state.pointerId !== event.pointerId || weekSlideAnimatingRef.current) return;
-
-    const deltaX = event.clientX - state.startX;
-    const deltaY = event.clientY - state.startY;
-
-    if (!state.dragging) {
-      if (Math.abs(deltaX) < 18 || Math.abs(deltaX) <= Math.abs(deltaY)) {
-        return;
-      }
-      state.dragging = true;
-    }
-
-    state.lastDeltaX = deltaX;
-    const maxOffset = event.currentTarget.clientWidth;
-    setWeekDragOffset(Math.max(-maxOffset, Math.min(maxOffset, deltaX)));
-  };
-
-  const finishWeekPointerGesture = (event, cancelled = false) => {
-    const state = weekDragStateRef.current;
-    if (event && state.pointerId !== event.pointerId) return;
-
-    if (state.pointerId !== null && event.currentTarget.hasPointerCapture?.(state.pointerId)) {
-      event.currentTarget.releasePointerCapture(state.pointerId);
-    }
-
-    const direction = !cancelled && state.dragging
-      ? getSwipeDirection(state.lastDeltaX, event.currentTarget.clientWidth)
-      : null;
-    const shouldAnimate = state.dragging && Math.abs(state.lastDeltaX) >= 1;
-
-    weekSlideAnimatingRef.current = shouldAnimate;
-    setWeekSlideTransition(shouldAnimate ? 'transform 0.24s cubic-bezier(0.22, 1, 0.36, 1)' : 'none');
-    setWeekSlideDirection(direction);
-    setWeekDragOffset(0);
-    weekDragStateRef.current = {
-      pointerId: null,
-      startX: 0,
-      startY: 0,
-      lastDeltaX: 0,
-      dragging: state.dragging,
-    };
-  };
-
-  const handleWeekTransitionEnd = (event) => {
-    if (event.target !== event.currentTarget || event.propertyName !== 'transform') return;
-
-    if (weekSlideDirection) {
-      shiftSelectedDateByDays(weekSlideDirection === 'next' ? 7 : -7);
-    }
-
-    setWeekSlideTransition('none');
-    setWeekSlideDirection(null);
-    setWeekDragOffset(0);
-    weekSlideAnimatingRef.current = false;
-  };
-
-  const weekTrackTransform = weekSlideDirection === 'next'
-    ? 'translate3d(-200%, 0, 0)'
-    : weekSlideDirection === 'prev'
-      ? 'translate3d(0, 0, 0)'
-      : `translate3d(calc(-100% + ${weekDragOffset}px), 0, 0)`;
 
   // Helper function to extract YouTube video ID from URL
   const getYouTubeVideoId = (url) => {
@@ -1122,86 +1026,15 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
           <div style={{ marginBottom: '8px', fontSize: '0.8em', color: '#888', textAlign: 'center' }}>
             Drag left or right to switch weeks
           </div>
-          <div
-            onPointerDown={handleWeekPointerDown}
-            onPointerMove={handleWeekPointerMove}
-            onPointerUp={(event) => finishWeekPointerGesture(event)}
-            onPointerCancel={(event) => finishWeekPointerGesture(event, true)}
-            style={{
-              marginBottom: '20px',
-              width: '100%',
-              touchAction: 'pan-y',
-              userSelect: 'none',
-              overflow: 'hidden'
-            }}
-          >
-            <div
-              onTransitionEnd={handleWeekTransitionEnd}
-              style={{
-                display: 'flex',
-                width: '100%',
-                transform: weekTrackTransform,
-                transition: weekSlideTransition,
-                willChange: 'transform'
-              }}
-            >
-              {weekPanels.map((panelDates) => (
-                <div
-                  key={toDateKey(panelDates[0])}
-                  style={{
-                    flex: '0 0 100%',
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(7, 1fr)',
-                    gap: '5px',
-                    minWidth: 0
-                  }}
-                >
-                  {panelDates.map((date) => {
-                    const hasWorkoutOnDate = hasWorkout(date);
-                    const isSelected = isSelectedDate(date);
-                    const isTodayDate = isToday(date);
-
-                    return (
-                      <div
-                        key={toDateKey(date)}
-                        onClick={() => {
-                          if (weekDragStateRef.current.dragging) {
-                            weekDragStateRef.current.dragging = false;
-                            return;
-                          }
-                          setSelectedDate(date);
-                        }}
-                        style={{
-                          padding: '10px 5px',
-                          textAlign: 'center',
-                          borderRadius: '8px',
-                          cursor: 'pointer',
-                          backgroundColor: hasWorkoutOnDate
-                            ? (isTodayDate ? '#4f7a2a' : '#2d5016')
-                            : (isTodayDate ? '#4a4a4a' : '#333'),
-                          border: isSelected ? '2px solid #646cff' : isTodayDate ? '2px solid #555' : '1px solid #444',
-                          transition: 'background-color 0.2s, border-color 0.2s, color 0.2s',
-                          minWidth: 0
-                        }}
-                      >
-                        <div style={{ fontSize: '0.75em', color: '#aaa', marginBottom: '5px' }}>
-                          {formatDayName(date)}
-                        </div>
-                        <div style={{ fontSize: '0.95em', fontWeight: isSelected ? 'bold' : 'normal' }}>
-                          {formatDate(date)}
-                        </div>
-                        {hasWorkoutOnDate && (
-                          <div style={{ marginTop: '3px', fontSize: '0.7em', color: '#8bc34a' }}>
-                            ✓
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-          </div>
+          <WeekCarousel
+            selectedDate={selectedDate}
+            onSelectDate={setSelectedDate}
+            hasWorkout={hasWorkout}
+            isToday={isToday}
+            toDateKey={toDateKey}
+            formatDayName={formatDayName}
+            formatDate={formatDate}
+          />
 
           {/* Show workout details for selected date */}
           <div>

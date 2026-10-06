@@ -934,10 +934,20 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
           </div>
 
           <div style={{
+            position: 'sticky',
+            top: '12px',
+            zIndex: 1,
             display: 'grid',
             gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
             gap: '12px',
-            marginBottom: '20px'
+            marginBottom: '20px',
+            padding: '10px',
+            backgroundColor: 'rgba(17, 17, 17, 0.92)',
+            border: '1px solid #333',
+            borderRadius: '14px',
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)'
           }}>
             <div
               onClick={async () => {

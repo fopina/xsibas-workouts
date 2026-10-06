@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from 'preact/hooks';
+import { useState, useEffect, useMemo, useRef } from 'preact/hooks';
 import { validateSpreadsheetSchema, formatValidationErrors } from '../utils/schemaValidator';
+import { findAdjacentWorkoutDateKeys, hasWorkoutInDateKeys } from '../utils/workoutNavigation';
 import {
   getSectionAutoStats,
   buildSectionScoreValue,
@@ -185,6 +186,16 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
 
     setWeekDates(generateWeekDates(selectedDate));
   }, [selectedDate]);
+
+  const adjacentWorkoutDates = useMemo(() => findAdjacentWorkoutDateKeys(
+    Object.keys(workoutDateRowsMap),
+    toDateKey(selectedDate),
+  ), [workoutDateRowsMap, selectedDate]);
+
+  const displayedWeekHasWorkouts = useMemo(() => hasWorkoutInDateKeys(
+    weekDates.map(toDateKey),
+    Object.keys(workoutDateRowsMap),
+  ), [weekDates, workoutDateRowsMap]);
 
   // Generate month calendar (6 weeks to show full month grid)
   const generateMonthDates = (month) => {
@@ -745,6 +756,11 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
 
   const isSelectedDate = (date) => {
     return date.toDateString() === selectedDate.toDateString();
+  };
+
+  const selectWorkoutDate = (dateKey) => {
+    const workoutDate = parseLocalDateString(dateKey);
+    if (workoutDate) setSelectedDate(workoutDate);
   };
 
   // Function to update section score in the spreadsheet
@@ -1551,7 +1567,36 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
                 })()}
               </div>
             ) : (
-              <p style={{ color: '#888' }}>No workout logged for {formatDate(selectedDate)}</p>
+              <div>
+                <p style={{ color: '#888' }}>No workout logged for {formatDate(selectedDate)}</p>
+                {!displayedWeekHasWorkouts && (adjacentWorkoutDates.previous || adjacentWorkoutDates.next) && (
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+                    gap: '10px',
+                    marginTop: '14px'
+                  }}>
+                    {adjacentWorkoutDates.previous && (
+                      <button
+                        onClick={() => selectWorkoutDate(adjacentWorkoutDates.previous)}
+                        aria-label={`Go to previous workout on ${formatDate(parseLocalDateString(adjacentWorkoutDates.previous))}`}
+                        style={{ padding: '0.7em 1em', textAlign: 'left' }}
+                      >
+                        ← Previous workout · {formatDate(parseLocalDateString(adjacentWorkoutDates.previous))}
+                      </button>
+                    )}
+                    {adjacentWorkoutDates.next && (
+                      <button
+                        onClick={() => selectWorkoutDate(adjacentWorkoutDates.next)}
+                        aria-label={`Go to next workout on ${formatDate(parseLocalDateString(adjacentWorkoutDates.next))}`}
+                        style={{ padding: '0.7em 1em', textAlign: 'right' }}
+                      >
+                        Next workout · {formatDate(parseLocalDateString(adjacentWorkoutDates.next))} →
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>

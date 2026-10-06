@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'preact/hooks';
 import { validateSpreadsheetSchema, formatValidationErrors } from '../utils/schemaValidator';
-import { findAdjacentWorkoutDateKeys } from '../utils/workoutNavigation';
+import { findAdjacentWorkoutDateKeys, hasWorkoutInDateKeys } from '../utils/workoutNavigation';
 import {
   getSectionAutoStats,
   buildSectionScoreValue,
@@ -191,6 +191,11 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
     Object.keys(workoutDateRowsMap),
     toDateKey(selectedDate),
   ), [workoutDateRowsMap, selectedDate]);
+
+  const displayedWeekHasWorkouts = useMemo(() => hasWorkoutInDateKeys(
+    weekDates.map(toDateKey),
+    Object.keys(workoutDateRowsMap),
+  ), [weekDates, workoutDateRowsMap]);
 
   // Generate month calendar (6 weeks to show full month grid)
   const generateMonthDates = (month) => {
@@ -1564,7 +1569,7 @@ const WorkoutLog = ({ accessToken, sheetId, onSheetTitleLoaded, onAuthRequired, 
             ) : (
               <div>
                 <p style={{ color: '#888' }}>No workout logged for {formatDate(selectedDate)}</p>
-                {(adjacentWorkoutDates.previous || adjacentWorkoutDates.next) && (
+                {!displayedWeekHasWorkouts && (adjacentWorkoutDates.previous || adjacentWorkoutDates.next) && (
                   <div style={{
                     display: 'grid',
                     gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
